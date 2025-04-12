@@ -5,10 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"io"
 	"os"
-
-	"github.com/ThinkInAIXYZ/go-mcp/pkg"
+	"strings"
 )
 
 const stdioSessionID = "stdio"
@@ -94,7 +94,8 @@ func (t *stdioServerTransport) receive(ctx context.Context) {
 			return
 		default:
 			// filter empty messages
-			if s.Text() == "" || s.Text() == " " {
+			// filter space messages and \t messages
+			if len(strings.TrimFunc(s.Text(), func(r rune) bool { return r == ' ' || r == '\t' })) == 0 {
 				continue
 			}
 			if err := t.receiver.Receive(ctx, stdioSessionID, s.Bytes()); err != nil {
