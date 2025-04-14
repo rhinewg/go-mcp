@@ -6,9 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"io"
 	"os"
+
+	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
 
 const stdioSessionID = "stdio"
