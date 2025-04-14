@@ -38,7 +38,7 @@ func TestSSE(t *testing.T) {
 
 func TestSSEHandler(t *testing.T) {
 	var (
-		messageUrl = "/message"
+		messageURL = "/message"
 		port       int
 
 		err    error
@@ -55,19 +55,19 @@ func TestSSEHandler(t *testing.T) {
 	serverAddr := fmt.Sprintf("http://127.0.0.1:%d", port)
 	serverURL := fmt.Sprintf("%s/sse", serverAddr)
 
-	svr, handler, err := NewSSEServerTransportAndHandler(fmt.Sprintf("%s%s", serverAddr, messageUrl))
+	svr, handler, err := NewSSEServerTransportAndHandler(fmt.Sprintf("%s%s", serverAddr, messageURL))
 	if err != nil {
 		t.Fatalf("NewSSEServerTransport failed: %v", err)
 	}
 
 	// 设置 HTTP 路由
 	http.Handle("/sse", handler.HandleSSE())
-	http.Handle(messageUrl, handler.HandleMessage())
+	http.Handle(messageURL, handler.HandleMessage())
 
 	errCh := make(chan error, 1)
 	go func() {
-		if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
-			log.Fatalf("Failed to start HTTP server: %v", err)
+		if e := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); e != nil {
+			log.Fatalf("Failed to start HTTP server: %v", e)
 		}
 	}()
 

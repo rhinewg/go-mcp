@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -126,7 +127,7 @@ func (server *Server) Run() error {
 			}
 			return nil
 		case <-ticker.C:
-			server.sessionID2session.Range(func(key string, value *session) bool {
+			server.sessionID2session.Range(func(key string, _ *session) bool {
 				if server.inShutdown.Load().(bool) {
 					return false
 				}
@@ -136,6 +137,9 @@ func (server *Server) Run() error {
 
 				if _, err := server.Ping(setSessionIDToCtx(ctx, key), protocol.NewPingRequest()); err != nil {
 					server.logger.Warnf("sessionID=%s ping failed: %v", key, err)
+					if errors.Is(err, pkg.ErrLackSession) {
+						server.sessionID2session.Delete(key)
+					}
 				}
 				return true
 			})
