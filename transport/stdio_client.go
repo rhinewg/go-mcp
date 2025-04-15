@@ -30,7 +30,7 @@ const mcpMessageDelimiter = '\n'
 
 type stdioClientTransport struct {
 	cmd      *exec.Cmd
-	receiver ClientReceiver
+	receiver clientReceiver
 	reader   io.Reader
 	writer   io.WriteCloser
 
@@ -92,7 +92,7 @@ func (t *stdioClientTransport) Send(_ context.Context, msg Message) error {
 	return err
 }
 
-func (t *stdioClientTransport) SetReceiver(receiver ClientReceiver) {
+func (t *stdioClientTransport) SetReceiver(receiver clientReceiver) {
 	t.receiver = receiver
 }
 

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
-	"github.com/ThinkInAIXYZ/go-mcp/server/session"
 )
 
 type SSEServerTransportOption func(*sseServerTransport)
@@ -63,9 +62,9 @@ type sseServerTransport struct {
 
 	inFlySend sync.WaitGroup
 
-	receiver ServerReceiver
+	receiver serverReceiver
 
-	sessionManager session.TransportSessionManager
+	sessionManager sessionManager
 
 	// options
 	logger      pkg.Logger
@@ -198,11 +197,11 @@ func (t *sseServerTransport) Send(ctx context.Context, sessionID string, msg Mes
 	}
 }
 
-func (t *sseServerTransport) SetReceiver(receiver ServerReceiver) {
+func (t *sseServerTransport) SetReceiver(receiver serverReceiver) {
 	t.receiver = receiver
 }
 
-func (t *sseServerTransport) SetSessionManager(manager session.TransportSessionManager) {
+func (t *sseServerTransport) SetSessionManager(manager sessionManager) {
 	t.sessionManager = manager
 }
 
@@ -322,7 +321,7 @@ func (t *sseServerTransport) Shutdown(userCtx context.Context, serverCtx context
 
 		t.inFlySend.Wait()
 
-		t.sessionManager.CloseAllSession()
+		t.sessionManager.CloseAllSessions()
 	}
 
 	if t.httpSvr == nil {

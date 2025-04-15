@@ -5,32 +5,59 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
 
-type serverReceive func(ctx context.Context, sessionID string, msg []byte) error
-
-func (r serverReceive) Receive(ctx context.Context, sessionID string, msg []byte) error {
-	return r(ctx, sessionID, msg)
+type mockSessionManager struct {
+	pkg.SyncMap[chan []byte]
 }
 
-type clientReceive func(ctx context.Context, msg []byte) error
+func newMockSessionManager() *mockSessionManager {
+	return &mockSessionManager{}
+}
 
-func (r clientReceive) Receive(ctx context.Context, msg []byte) error {
-	return r(ctx, msg)
+func (m *mockSessionManager) CreateSession() (string, chan []byte) {
+	sessionID := uuid.New().String()
+	ch := make(chan []byte)
+	m.Store(sessionID, ch)
+	return sessionID, ch
+}
+
+func (m *mockSessionManager) GetSessionChan(sessionID string) (chan []byte, bool) {
+	return m.Load(sessionID)
+}
+
+func (m *mockSessionManager) CloseSession(sessionID string) {
+	ch, ok := m.LoadAndDelete(sessionID)
+	if !ok {
+		return
+	}
+	close(ch)
+}
+
+func (m *mockSessionManager) CloseAllSessions() {
+	m.Range(func(key string, value chan []byte) bool {
+		m.Delete(key)
+		close(value)
+		return true
+	})
 }
 
 func testTransport(t *testing.T, client ClientTransport, server ServerTransport) {
 	msgWithServer := "hello"
 	expectedMsgWithServerCh := make(chan string, 1)
-	server.SetReceiver(serverReceive(func(_ context.Context, _ string, msg []byte) error {
+	server.SetReceiver(ServerReceiverF(func(_ context.Context, _ string, msg []byte) error {
 		expectedMsgWithServerCh <- string(msg)
 		return nil
 	}))
+	server.SetSessionManager(newMockSessionManager())
 
 	msgWithClient := "hello"
 	expectedMsgWithClientCh := make(chan string, 1)
-	client.SetReceiver(clientReceive(func(_ context.Context, msg []byte) error {
+	client.SetReceiver(ClientReceiverF(func(_ context.Context, msg []byte) error {
 		expectedMsgWithClientCh <- string(msg)
 		return nil
 	}))

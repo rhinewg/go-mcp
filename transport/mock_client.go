@@ -3,6 +3,7 @@ package transport
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -10,7 +11,7 @@ import (
 )
 
 type mockClientTransport struct {
-	receiver ClientReceiver
+	receiver clientReceiver
 	in       io.ReadCloser
 	out      io.Writer
 
@@ -51,7 +52,7 @@ func (t *mockClientTransport) Send(_ context.Context, msg Message) error {
 	return nil
 }
 
-func (t *mockClientTransport) SetReceiver(receiver ClientReceiver) {
+func (t *mockClientTransport) SetReceiver(receiver clientReceiver) {
 	t.receiver = receiver
 }
 
@@ -83,7 +84,9 @@ func (t *mockClientTransport) receive(ctx context.Context) {
 	}
 
 	if err := s.Err(); err != nil {
-		t.logger.Errorf("unexpected error reading input: %v", err)
+		if !errors.Is(err, io.ErrClosedPipe) { // This error occurs during unit tests, suppressing it here
+			t.logger.Errorf("unexpected error reading input: %v", err)
+		}
 		return
 	}
 }

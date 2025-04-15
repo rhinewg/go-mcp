@@ -245,8 +245,6 @@ func TestUnmarshal(t *testing.T) {
 			err := verifySchemaAndUnmarshal(tt.args.schema, tt.args.content, tt.args.v)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Unmarshal() error = %v, wantErr %v", err, tt.wantErr)
-			} else if err == nil {
-				t.Logf("Unmarshal() v = %+v\n", tt.args.v)
 			}
 		})
 	}
@@ -353,7 +351,6 @@ func TestVerifyAndUnmarshal(t *testing.T) {
 			if err := VerifyAndUnmarshal(tt.args.content, tt.args.v); (err != nil) != tt.wantErr {
 				t.Errorf("VerifyAndUnmarshal() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			t.Logf("VerifyAndUnmarshal() v = %+v\n", tt.args.v)
 		})
 	}
 }

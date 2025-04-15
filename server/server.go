@@ -8,10 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	cmap "github.com/orcaman/concurrent-map/v2"
-
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
+	"github.com/ThinkInAIXYZ/go-mcp/server/session"
 	"github.com/ThinkInAIXYZ/go-mcp/transport"
 )
 
@@ -49,8 +48,7 @@ type Server struct {
 	resources         pkg.SyncMap[*resourceEntry]
 	resourceTemplates pkg.SyncMap[*resourceTemplateEntry]
 
-	// TODO：需要定期清理无效session
-	sessionID2session pkg.SyncMap[*session]
+	sessionManager *session.Manager
 
 	inShutdown   atomic.Value // true when server is in shutdown
 	inFlyRequest sync.WaitGroup
@@ -62,31 +60,6 @@ type Server struct {
 	logger pkg.Logger
 }
 
-type session struct {
-	requestID int64
-
-	reqID2respChan cmap.ConcurrentMap[string, chan *protocol.JSONRPCResponse]
-
-	// cache client initialize reqeust info
-	clientInfo         *protocol.Implementation
-	clientCapabilities *protocol.ClientCapabilities
-
-	// subscribed resources
-	subscribedResources cmap.ConcurrentMap[string, struct{}]
-
-	receiveInitRequest atomic.Value
-	ready              atomic.Value
-}
-
-func newSession() *session {
-	return &session{
-		reqID2respChan:      cmap.New[chan *protocol.JSONRPCResponse](),
-		subscribedResources: cmap.New[struct{}](),
-		receiveInitRequest:  *pkg.NewBoolAtomic(),
-		ready:               *pkg.NewBoolAtomic(),
-	}
-}
-
 func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
 	server := &Server{
 		transport: t,
@@ -95,15 +68,18 @@ func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
 			Resources: &protocol.ResourcesCapability{ListChanged: true, Subscribe: true},
 			Tools:     &protocol.ToolsCapability{ListChanged: true},
 		},
-		inShutdown: *pkg.NewBoolAtomic(),
-		serverInfo: &protocol.Implementation{},
-		logger:     pkg.DefaultLogger,
+		sessionManager: session.NewManager(),
+		inShutdown:     *pkg.NewBoolAtomic(),
+		serverInfo:     &protocol.Implementation{},
+		logger:         pkg.DefaultLogger,
 	}
 	t.SetReceiver(transport.ServerReceiverF(server.receive))
 
 	for _, opt := range opts {
 		opt(server)
 	}
+
+	t.SetSessionManager(server.sessionManager)
 
 	return server, nil
 }
@@ -127,7 +103,7 @@ func (server *Server) Run() error {
 			}
 			return nil
 		case <-ticker.C:
-			server.sessionID2session.Range(func(key string, _ *session) bool {
+			server.sessionManager.RangeSessions(func(key string, _ *session.State) bool {
 				if server.inShutdown.Load().(bool) {
 					return false
 				}
@@ -138,7 +114,7 @@ func (server *Server) Run() error {
 				if _, err := server.Ping(setSessionIDToCtx(ctx, key), protocol.NewPingRequest()); err != nil {
 					server.logger.Warnf("sessionID=%s ping failed: %v", key, err)
 					if errors.Is(err, pkg.ErrLackSession) {
-						server.sessionID2session.Delete(key)
+						server.sessionManager.CloseSession(key)
 					}
 				}
 				return true
@@ -156,7 +132,7 @@ type ToolHandlerFunc func(*protocol.CallToolRequest) (*protocol.CallToolResult, 
 
 func (server *Server) RegisterTool(tool *protocol.Tool, toolHandler ToolHandlerFunc) {
 	server.tools.Store(tool.Name, &toolEntry{tool: tool, handler: toolHandler})
-	if !server.sessionID2session.IsEmpty() {
+	if !server.sessionManager.IsEmpty() {
 		if err := server.sendNotification4ToolListChanges(context.Background()); err != nil {
 			server.logger.Warnf("send notification toll list changes fail: %v", err)
 			return
@@ -166,7 +142,7 @@ func (server *Server) RegisterTool(tool *protocol.Tool, toolHandler ToolHandlerF
 
 func (server *Server) UnregisterTool(name string) {
 	server.tools.Delete(name)
-	if !server.sessionID2session.IsEmpty() {
+	if !server.sessionManager.IsEmpty() {
 		if err := server.sendNotification4ToolListChanges(context.Background()); err != nil {
 			server.logger.Warnf("send notification toll list changes fail: %v", err)
 			return
@@ -183,7 +159,7 @@ type PromptHandlerFunc func(*protocol.GetPromptRequest) (*protocol.GetPromptResu
 
 func (server *Server) RegisterPrompt(prompt *protocol.Prompt, promptHandler PromptHandlerFunc) {
 	server.prompts.Store(prompt.Name, &promptEntry{prompt: prompt, handler: promptHandler})
-	if !server.sessionID2session.IsEmpty() {
+	if !server.sessionManager.IsEmpty() {
 		if err := server.sendNotification4PromptListChanges(context.Background()); err != nil {
 			server.logger.Warnf("send notification prompt list changes fail: %v", err)
 			return
@@ -193,7 +169,7 @@ func (server *Server) RegisterPrompt(prompt *protocol.Prompt, promptHandler Prom
 
 func (server *Server) UnregisterPrompt(name string) {
 	server.prompts.Delete(name)
-	if !server.sessionID2session.IsEmpty() {
+	if !server.sessionManager.IsEmpty() {
 		if err := server.sendNotification4PromptListChanges(context.Background()); err != nil {
 			server.logger.Warnf("send notification prompt list changes fail: %v", err)
 			return
@@ -210,7 +186,7 @@ type ResourceHandlerFunc func(*protocol.ReadResourceRequest) (*protocol.ReadReso
 
 func (server *Server) RegisterResource(resource *protocol.Resource, resourceHandler ResourceHandlerFunc) {
 	server.resources.Store(resource.URI, &resourceEntry{resource: resource, handler: resourceHandler})
-	if !server.sessionID2session.IsEmpty() {
+	if !server.sessionManager.IsEmpty() {
 		if err := server.sendNotification4ResourceListChanges(context.Background()); err != nil {
 			server.logger.Warnf("send notification resource list changes fail: %v", err)
 			return
@@ -220,7 +196,7 @@ func (server *Server) RegisterResource(resource *protocol.Resource, resourceHand
 
 func (server *Server) UnregisterResource(uri string) {
 	server.resources.Delete(uri)
-	if !server.sessionID2session.IsEmpty() {
+	if !server.sessionManager.IsEmpty() {
 		if err := server.sendNotification4ResourceListChanges(context.Background()); err != nil {
 			server.logger.Warnf("send notification resource list changes fail: %v", err)
 			return
@@ -238,7 +214,7 @@ func (server *Server) RegisterResourceTemplate(resource *protocol.ResourceTempla
 		return err
 	}
 	server.resourceTemplates.Store(resource.URITemplate, &resourceTemplateEntry{resourceTemplate: resource, handler: resourceHandler})
-	if !server.sessionID2session.IsEmpty() {
+	if !server.sessionManager.IsEmpty() {
 		if err := server.sendNotification4ResourceListChanges(context.Background()); err != nil {
 			server.logger.Warnf("send notification resource list changes fail: %v", err)
 			return nil
@@ -249,7 +225,7 @@ func (server *Server) RegisterResourceTemplate(resource *protocol.ResourceTempla
 
 func (server *Server) UnregisterResourceTemplate(uriTemplate string) {
 	server.resourceTemplates.Delete(uriTemplate)
-	if !server.sessionID2session.IsEmpty() {
+	if !server.sessionManager.IsEmpty() {
 		if err := server.sendNotification4ResourceListChanges(context.Background()); err != nil {
 			server.logger.Warnf("send notification resource list changes fail: %v", err)
 			return

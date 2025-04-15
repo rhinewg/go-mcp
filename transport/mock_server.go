@@ -8,13 +8,12 @@ import (
 	"io"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
-	"github.com/ThinkInAIXYZ/go-mcp/server/session"
 )
 
 const mockSessionID = "mock"
 
 type mockServerTransport struct {
-	receiver ServerReceiver
+	receiver serverReceiver
 	in       io.ReadCloser
 	out      io.Writer
 
@@ -51,11 +50,11 @@ func (t *mockServerTransport) Send(_ context.Context, _ string, msg Message) err
 	return nil
 }
 
-func (t *mockServerTransport) SetReceiver(receiver ServerReceiver) {
+func (t *mockServerTransport) SetReceiver(receiver serverReceiver) {
 	t.receiver = receiver
 }
 
-func (t *mockServerTransport) SetSessionManager(session.TransportSessionManager) {}
+func (t *mockServerTransport) SetSessionManager(sessionManager) {}
 
 func (t *mockServerTransport) Shutdown(userCtx context.Context, serverCtx context.Context) error {
 	t.cancel()

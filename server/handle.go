@@ -24,12 +24,13 @@ func (server *Server) handleRequestWithInitialize(sessionID string, rawParams js
 		return nil, fmt.Errorf("protocol version not supported, supported version is %v", protocol.Version)
 	}
 
-	s := newSession()
-	s.clientInfo = &request.ClientInfo
-	s.clientCapabilities = &request.Capabilities
-	s.receiveInitRequest.Store(true)
-
-	server.sessionID2session.Store(sessionID, s)
+	s, ok := server.sessionManager.GetSession(sessionID)
+	if !ok {
+		return nil, pkg.ErrLackSession
+	}
+	s.ClientInfo = &request.ClientInfo
+	s.ClientCapabilities = &request.Capabilities
+	s.ReceiveInitRequest.Store(true)
 
 	return &protocol.InitializeResult{
 		ServerInfo:      *server.serverInfo,
@@ -173,11 +174,11 @@ func (server *Server) handleRequestWithSubscribeResourceChange(sessionID string,
 		return nil, err
 	}
 
-	s, ok := server.sessionID2session.Load(sessionID)
+	s, ok := server.sessionManager.GetSession(sessionID)
 	if !ok {
 		return nil, pkg.ErrLackSession
 	}
-	s.subscribedResources.Set(request.URI, struct{}{})
+	s.SubscribedResources.Set(request.URI, struct{}{})
 	return protocol.NewSubscribeResult(), nil
 }
 
@@ -191,11 +192,11 @@ func (server *Server) handleRequestWithUnSubscribeResourceChange(sessionID strin
 		return nil, err
 	}
 
-	s, ok := server.sessionID2session.Load(sessionID)
+	s, ok := server.sessionManager.GetSession(sessionID)
 	if !ok {
 		return nil, pkg.ErrLackSession
 	}
-	s.subscribedResources.Remove(request.URI)
+	s.SubscribedResources.Remove(request.URI)
 	return protocol.NewUnsubscribeResult(), nil
 }
 
@@ -246,14 +247,14 @@ func (server *Server) handleNotifyWithInitialized(sessionID string, rawParams js
 		}
 	}
 
-	s, ok := server.sessionID2session.Load(sessionID)
+	s, ok := server.sessionManager.GetSession(sessionID)
 	if !ok {
 		return pkg.ErrLackSession
 	}
 
-	if !s.receiveInitRequest.Load().(bool) {
+	if !s.ReceiveInitRequest.Load().(bool) {
 		return fmt.Errorf("the server has not received the client's initialization request")
 	}
-	s.ready.Store(true)
+	s.Ready.Store(true)
 	return nil
 }
