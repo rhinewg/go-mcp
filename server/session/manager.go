@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"time"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
@@ -8,10 +9,17 @@ import (
 
 type Manager struct {
 	sessions pkg.SyncMap[*State]
+
+	stopHeartbeat chan struct{}
+
+	detection func(ctx context.Context, sessionID string) error
 }
 
-func NewManager() *Manager {
-	return &Manager{}
+func NewManager(detection func(ctx context.Context, sessionID string) error) *Manager {
+	return &Manager{
+		detection:     detection,
+		stopHeartbeat: make(chan struct{}),
+	}
 }
 
 func (m *Manager) CreateSession(sessionID string) {
@@ -27,16 +35,13 @@ func (m *Manager) GetSession(sessionID string) (*State, bool) {
 	return state, true
 }
 
-func (m *Manager) GetSessionChan(sessionID string) (chan []byte, bool) {
+func (m *Manager) GetSessionSendChan(sessionID string) (chan []byte, bool) {
 	state, has := m.GetSession(sessionID)
 	if !has {
 		return nil, false
 	}
 
-	// 更新最后活跃时间
-	state.LastActiveAt = time.Now()
-
-	return state.MessageChan, true
+	return state.SendChan, true
 }
 
 func (m *Manager) CloseSession(sessionID string) {
@@ -44,28 +49,39 @@ func (m *Manager) CloseSession(sessionID string) {
 	if !ok {
 		return
 	}
-	close(state.MessageChan)
+	close(state.SendChan)
 }
 
 func (m *Manager) CloseAllSessions() {
 	m.sessions.Range(func(sessionID string, state *State) bool {
 		m.sessions.Delete(sessionID)
-		close(state.MessageChan)
+		close(state.SendChan)
 		return true
 	})
 }
 
-func (m *Manager) CycleCleanSessions(maxIdleTime time.Duration) {
-	now := time.Now()
-	var expiredCount int64
+func (m *Manager) StartHeartbeat() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
 
-	m.sessions.Range(func(sessionID string, state *State) bool {
-		if now.Sub(state.LastActiveAt) > maxIdleTime {
-			m.CloseSession(sessionID)
-			expiredCount++
-		}
-		return true
-	})
+	select {
+	case <-m.stopHeartbeat:
+		return
+	case <-ticker.C:
+		m.sessions.Range(func(sessionID string, _ *State) bool {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			if err := m.detection(ctx, sessionID); err != nil {
+				m.CloseSession(sessionID)
+			}
+			return true
+		})
+	}
+}
+
+func (m *Manager) StopHeartbeat() {
+	close(m.stopHeartbeat)
 }
 
 func (m *Manager) RangeSessions(f func(sessionID string, state *State) bool) {

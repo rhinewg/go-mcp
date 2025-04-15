@@ -186,7 +186,7 @@ func (t *sseServerTransport) Send(ctx context.Context, sessionID string, msg Mes
 	default:
 	}
 
-	ch, ok := t.sessionManager.GetSessionChan(sessionID)
+	ch, ok := t.sessionManager.GetSessionSendChan(sessionID)
 	if !ok {
 		return pkg.ErrLackSession
 	}
@@ -231,7 +231,7 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 	t.sessionManager.CreateSession(sessionID)
 	defer t.sessionManager.CloseSession(sessionID)
 
-	sessionChan, ok := t.sessionManager.GetSessionChan(sessionID)
+	sessionChan, ok := t.sessionManager.GetSessionSendChan(sessionID)
 	if !ok {
 		http.Error(w, "Session lost", http.StatusInternalServerError)
 	}
@@ -285,7 +285,7 @@ func (t *sseServerTransport) handleMessage(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	_, ok := t.sessionManager.GetSessionChan(sessionID)
+	_, ok := t.sessionManager.GetSessionSendChan(sessionID)
 	if !ok {
 		t.writeError(w, http.StatusBadRequest, "Invalid session ID")
 		return

@@ -77,15 +77,11 @@ func (f ServerReceiverF) Receive(ctx context.Context, sessionID string, msg []by
 }
 
 type sessionManager interface {
-	// CreateSession 创建新的会话，返回会话ID和消息通道
 	CreateSession(sessionID string)
 
-	// GetSessionChan 获取会话消息通道
-	GetSessionChan(sessionID string) (chan []byte, bool)
+	GetSessionSendChan(sessionID string) (chan []byte, bool)
 
-	// CloseSession 关闭会话
 	CloseSession(sessionID string)
 
-	// CloseAllSessions 关闭全部会话
 	CloseAllSessions()
 }

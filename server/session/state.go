@@ -13,7 +13,7 @@ import (
 type State struct {
 	LastActiveAt time.Time
 
-	MessageChan chan []byte
+	SendChan chan []byte
 
 	RequestID int64
 
@@ -33,7 +33,7 @@ type State struct {
 func NewState() *State {
 	return &State{
 		LastActiveAt:        time.Now(),
-		MessageChan:         make(chan []byte, 64),
+		SendChan:            make(chan []byte, 64),
 		ReqID2respChan:      cmap.New[chan *protocol.JSONRPCResponse](),
 		SubscribedResources: cmap.New[struct{}](),
 		ReceiveInitRequest:  *pkg.NewBoolAtomic(),

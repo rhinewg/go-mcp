@@ -2,11 +2,9 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
@@ -68,12 +66,14 @@ func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
 			Resources: &protocol.ResourcesCapability{ListChanged: true, Subscribe: true},
 			Tools:     &protocol.ToolsCapability{ListChanged: true},
 		},
-		sessionManager: session.NewManager(),
-		inShutdown:     *pkg.NewBoolAtomic(),
-		serverInfo:     &protocol.Implementation{},
-		logger:         pkg.DefaultLogger,
+		inShutdown: *pkg.NewBoolAtomic(),
+		serverInfo: &protocol.Implementation{},
+		logger:     pkg.DefaultLogger,
 	}
+
 	t.SetReceiver(transport.ServerReceiverF(server.receive))
+
+	server.sessionManager = session.NewManager(server.sessionDetection)
 
 	for _, opt := range opts {
 		opt(server)
@@ -85,42 +85,16 @@ func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
 }
 
 func (server *Server) Run() error {
-	errCh := make(chan error, 1)
 	go func() {
 		defer pkg.Recover()
 
-		errCh <- server.transport.Run()
+		server.sessionManager.StartHeartbeat()
 	}()
 
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case err := <-errCh:
-			if err != nil {
-				return fmt.Errorf("init mcp server transpor run fail: %w", err)
-			}
-			return nil
-		case <-ticker.C:
-			server.sessionManager.RangeSessions(func(key string, _ *session.State) bool {
-				if server.inShutdown.Load().(bool) {
-					return false
-				}
-
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-
-				if _, err := server.Ping(setSessionIDToCtx(ctx, key), protocol.NewPingRequest()); err != nil {
-					server.logger.Warnf("sessionID=%s ping failed: %v", key, err)
-					if errors.Is(err, pkg.ErrLackSession) {
-						server.sessionManager.CloseSession(key)
-					}
-				}
-				return true
-			})
-		}
+	if err := server.transport.Run(); err != nil {
+		return fmt.Errorf("init mcp server transpor run fail: %w", err)
 	}
+	return nil
 }
 
 type toolEntry struct {
@@ -234,6 +208,8 @@ func (server *Server) UnregisterResourceTemplate(uriTemplate string) {
 }
 
 func (server *Server) Shutdown(userCtx context.Context) error {
+	defer server.sessionManager.StopHeartbeat()
+
 	server.inShutdown.Store(true)
 
 	serverCtx, cancel := context.WithCancel(userCtx)
@@ -247,4 +223,15 @@ func (server *Server) Shutdown(userCtx context.Context) error {
 	}()
 
 	return server.transport.Shutdown(userCtx, serverCtx)
+}
+
+func (server *Server) sessionDetection(ctx context.Context, sessionID string) error {
+	if server.inShutdown.Load().(bool) {
+		return nil
+	}
+
+	if _, err := server.Ping(setSessionIDToCtx(ctx, sessionID), protocol.NewPingRequest()); err != nil {
+		return err
+	}
+	return nil
 }

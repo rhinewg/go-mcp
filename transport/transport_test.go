@@ -22,7 +22,7 @@ func (m *mockSessionManager) CreateSession(sessionID string) {
 	m.Store(sessionID, make(chan []byte))
 }
 
-func (m *mockSessionManager) GetSessionChan(sessionID string) (chan []byte, bool) {
+func (m *mockSessionManager) GetSessionSendChan(sessionID string) (chan []byte, bool) {
 	return m.Load(sessionID)
 }
 
