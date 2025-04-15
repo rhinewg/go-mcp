@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
@@ -19,11 +18,8 @@ func newMockSessionManager() *mockSessionManager {
 	return &mockSessionManager{}
 }
 
-func (m *mockSessionManager) CreateSession() (string, chan []byte) {
-	sessionID := uuid.New().String()
-	ch := make(chan []byte)
-	m.Store(sessionID, ch)
-	return sessionID, ch
+func (m *mockSessionManager) CreateSession(sessionID string) {
+	m.Store(sessionID, make(chan []byte))
 }
 
 func (m *mockSessionManager) GetSessionChan(sessionID string) (chan []byte, bool) {

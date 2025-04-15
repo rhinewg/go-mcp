@@ -175,6 +175,6 @@ func defaultNotifyHandler(logger pkg.Logger, notify interface{}) error {
 	if err != nil {
 		return err
 	}
-	logger.Infof("receive notify: %+v", b)
+	logger.Infof("receive notify: %s", b)
 	return nil
 }

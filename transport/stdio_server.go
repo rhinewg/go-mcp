@@ -26,6 +26,8 @@ type stdioServerTransport struct {
 	reader   io.ReadCloser
 	writer   io.Writer
 
+	sessionManager sessionManager
+
 	logger pkg.Logger
 
 	cancel          context.CancelFunc
@@ -51,6 +53,8 @@ func (t *stdioServerTransport) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.cancel = cancel
 
+	t.sessionManager.CreateSession(stdioSessionID)
+
 	t.receive(ctx)
 
 	close(t.receiveShutDone)
@@ -68,7 +72,9 @@ func (t *stdioServerTransport) SetReceiver(receiver serverReceiver) {
 	t.receiver = receiver
 }
 
-func (t *stdioServerTransport) SetSessionManager(sessionManager) {}
+func (t *stdioServerTransport) SetSessionManager(m sessionManager) {
+	t.sessionManager = m
+}
 
 func (t *stdioServerTransport) Shutdown(userCtx context.Context, serverCtx context.Context) error {
 	t.cancel()

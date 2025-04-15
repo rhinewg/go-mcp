@@ -17,6 +17,8 @@ type mockServerTransport struct {
 	in       io.ReadCloser
 	out      io.Writer
 
+	sessionManager sessionManager
+
 	logger pkg.Logger
 
 	cancel          context.CancelFunc
@@ -37,6 +39,8 @@ func (t *mockServerTransport) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.cancel = cancel
 
+	t.sessionManager.CreateSession(mockSessionID)
+
 	t.receive(ctx)
 
 	close(t.receiveShutDone)
@@ -54,7 +58,9 @@ func (t *mockServerTransport) SetReceiver(receiver serverReceiver) {
 	t.receiver = receiver
 }
 
-func (t *mockServerTransport) SetSessionManager(sessionManager) {}
+func (t *mockServerTransport) SetSessionManager(m sessionManager) {
+	t.sessionManager = m
+}
 
 func (t *mockServerTransport) Shutdown(userCtx context.Context, serverCtx context.Context) error {
 	t.cancel()

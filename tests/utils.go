@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
@@ -50,7 +51,8 @@ func test(t *testing.T, runServer func() error, transportClient transport.Client
 	if err != nil {
 		t.Fatalf("Failed to list tools: %v", err)
 	}
-	fmt.Printf("Available tools: %+v\n", toolsResult.Tools)
+	bytes, _ := json.Marshal(toolsResult)
+	fmt.Printf("Available tools: %s\n", bytes)
 
 	// Call tool
 	callResult, err := mcpClient.CallTool(
@@ -61,7 +63,8 @@ func test(t *testing.T, runServer func() error, transportClient transport.Client
 	if err != nil {
 		t.Fatalf("Failed to call tool: %v", err)
 	}
-	fmt.Printf("Tool call result: %+v\n", callResult)
+	bytes, _ = json.Marshal(callResult)
+	fmt.Printf("Tool call result: %s\n", bytes)
 }
 
 func compileMockStdioServerTr() (string, error) {

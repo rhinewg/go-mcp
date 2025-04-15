@@ -14,16 +14,11 @@ func NewManager() *Manager {
 	return &Manager{}
 }
 
-// CreateSession 创建新的会话
-func (m *Manager) CreateSession() (string, chan []byte) {
+func (m *Manager) CreateSession(sessionID string) {
 	state := NewState()
-
-	m.sessions.Store(state.ID, state)
-
-	return state.ID, state.MessageChan
+	m.sessions.Store(sessionID, state)
 }
 
-// GetSession 获取会话状态
 func (m *Manager) GetSession(sessionID string) (*State, bool) {
 	state, has := m.sessions.Load(sessionID)
 	if !has {
@@ -32,7 +27,6 @@ func (m *Manager) GetSession(sessionID string) (*State, bool) {
 	return state, true
 }
 
-// GetSessionChan 获取会话消息通道
 func (m *Manager) GetSessionChan(sessionID string) (chan []byte, bool) {
 	state, has := m.GetSession(sessionID)
 	if !has {
@@ -45,7 +39,6 @@ func (m *Manager) GetSessionChan(sessionID string) (chan []byte, bool) {
 	return state.MessageChan, true
 }
 
-// CloseSession 关闭并删除会话
 func (m *Manager) CloseSession(sessionID string) {
 	state, ok := m.sessions.LoadAndDelete(sessionID)
 	if !ok {
@@ -54,18 +47,14 @@ func (m *Manager) CloseSession(sessionID string) {
 	close(state.MessageChan)
 }
 
-// CloseAllSessions 关闭所有会话
 func (m *Manager) CloseAllSessions() {
 	m.sessions.Range(func(sessionID string, state *State) bool {
-		// 删除会话
 		m.sessions.Delete(sessionID)
-		// 关闭消息通道
 		close(state.MessageChan)
 		return true
 	})
 }
 
-// CycleCleanSessions 清理过期会话
 func (m *Manager) CycleCleanSessions(maxIdleTime time.Duration) {
 	now := time.Now()
 	var expiredCount int64
@@ -79,7 +68,6 @@ func (m *Manager) CycleCleanSessions(maxIdleTime time.Duration) {
 	})
 }
 
-// RangeSessions 遍历所有会话
 func (m *Manager) RangeSessions(f func(sessionID string, state *State) bool) {
 	m.sessions.Range(f)
 }
