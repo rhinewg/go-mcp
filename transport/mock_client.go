@@ -9,7 +9,7 @@ import (
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
 
-type MockClientTransport struct {
+type mockClientTransport struct {
 	receiver ClientReceiver
 	in       io.ReadCloser
 	out      io.Writer
@@ -20,8 +20,8 @@ type MockClientTransport struct {
 	receiveShutDone chan struct{}
 }
 
-func NewMockClientTransport(in io.ReadCloser, out io.Writer) *MockClientTransport {
-	return &MockClientTransport{
+func NewMockClientTransport(in io.ReadCloser, out io.Writer) ClientTransport {
+	return &mockClientTransport{
 		in:              in,
 		out:             out,
 		logger:          pkg.DefaultLogger,
@@ -29,7 +29,7 @@ func NewMockClientTransport(in io.ReadCloser, out io.Writer) *MockClientTranspor
 	}
 }
 
-func (t *MockClientTransport) Start() error {
+func (t *mockClientTransport) Start() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.cancel = cancel
 
@@ -44,18 +44,18 @@ func (t *MockClientTransport) Start() error {
 	return nil
 }
 
-func (t *MockClientTransport) Send(_ context.Context, msg Message) error {
+func (t *mockClientTransport) Send(_ context.Context, msg Message) error {
 	if _, err := t.out.Write(append(msg, mcpMessageDelimiter)); err != nil {
 		return fmt.Errorf("failed to write: %w", err)
 	}
 	return nil
 }
 
-func (t *MockClientTransport) SetReceiver(receiver ClientReceiver) {
+func (t *mockClientTransport) SetReceiver(receiver ClientReceiver) {
 	t.receiver = receiver
 }
 
-func (t *MockClientTransport) Close() error {
+func (t *mockClientTransport) Close() error {
 	t.cancel()
 
 	if err := t.in.Close(); err != nil {
@@ -67,7 +67,7 @@ func (t *MockClientTransport) Close() error {
 	return nil
 }
 
-func (t *MockClientTransport) receive(ctx context.Context) {
+func (t *mockClientTransport) receive(ctx context.Context) {
 	s := bufio.NewScanner(t.in)
 
 	for s.Scan() {

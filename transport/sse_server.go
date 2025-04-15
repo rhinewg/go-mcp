@@ -11,9 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
+	"github.com/ThinkInAIXYZ/go-mcp/server/session"
 )
 
 type SSEServerTransportOption func(*sseServerTransport)
@@ -62,12 +61,11 @@ type sseServerTransport struct {
 
 	messageEndpointURL string // Auto-generated
 
-	// TODO: Need to periodically clean up invalid sessions
-	sessionStore pkg.SyncMap[chan []byte]
-
 	inFlySend sync.WaitGroup
 
 	receiver ServerReceiver
+
+	sessionManager session.TransportSessionManager
 
 	// options
 	logger      pkg.Logger
@@ -187,7 +185,7 @@ func (t *sseServerTransport) Send(ctx context.Context, sessionID string, msg Mes
 	default:
 	}
 
-	ch, ok := t.sessionStore.Load(sessionID)
+	ch, ok := t.sessionManager.GetSessionChan(sessionID)
 	if !ok {
 		return pkg.ErrLackSession
 	}
@@ -202,6 +200,10 @@ func (t *sseServerTransport) Send(ctx context.Context, sessionID string, msg Mes
 
 func (t *sseServerTransport) SetReceiver(receiver ServerReceiver) {
 	t.receiver = receiver
+}
+
+func (t *sseServerTransport) SetSessionManager(manager session.TransportSessionManager) {
+	t.sessionManager = manager
 }
 
 // handleSSE handles incoming SSE connections from clients and sends messages to them.
@@ -224,10 +226,8 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	// Create an SSE connection
-	sessionChan := make(chan []byte, 64)
-	sessionID := uuid.New().String()
-	t.sessionStore.Store(sessionID, sessionChan)
-	defer t.sessionStore.Delete(sessionID)
+	sessionID, sessionChan := t.sessionManager.CreateSession()
+	defer t.sessionManager.CloseSession(sessionID)
 
 	uri := fmt.Sprintf("%s?sessionID=%s", t.messageEndpointURL, sessionID)
 	// Send the initial endpoint event
@@ -278,7 +278,7 @@ func (t *sseServerTransport) handleMessage(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	_, ok := t.sessionStore.Load(sessionID)
+	_, ok := t.sessionManager.GetSessionChan(sessionID)
 	if !ok {
 		t.writeError(w, http.StatusBadRequest, "Invalid session ID")
 		return
@@ -322,10 +322,7 @@ func (t *sseServerTransport) Shutdown(userCtx context.Context, serverCtx context
 
 		t.inFlySend.Wait()
 
-		t.sessionStore.Range(func(_ string, ch chan []byte) bool {
-			close(ch)
-			return true
-		})
+		t.sessionManager.CloseAllSession()
 	}
 
 	if t.httpSvr == nil {

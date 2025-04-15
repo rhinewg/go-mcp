@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
+	"github.com/ThinkInAIXYZ/go-mcp/server/session"
 )
 
 const stdioSessionID = "stdio"
@@ -67,6 +68,8 @@ func (t *stdioServerTransport) Send(_ context.Context, _ string, msg Message) er
 func (t *stdioServerTransport) SetReceiver(receiver ServerReceiver) {
 	t.receiver = receiver
 }
+
+func (t *stdioServerTransport) SetSessionManager(session.TransportSessionManager) {}
 
 func (t *stdioServerTransport) Shutdown(userCtx context.Context, serverCtx context.Context) error {
 	t.cancel()

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
+	"github.com/ThinkInAIXYZ/go-mcp/server/session"
 )
 
 /*
@@ -51,6 +52,8 @@ type ServerTransport interface {
 
 	// SetReceiver sets the handler for messages from the peer
 	SetReceiver(ServerReceiver)
+
+	SetSessionManager(manager session.TransportSessionManager)
 
 	// Shutdown gracefully closes, the internal implementation needs to stop receiving messages first,
 	// then wait for serverCtx to be canceled, while using userCtx to control timeout.

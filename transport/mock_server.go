@@ -8,11 +8,12 @@ import (
 	"io"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
+	"github.com/ThinkInAIXYZ/go-mcp/server/session"
 )
 
 const mockSessionID = "mock"
 
-type MockServerTransport struct {
+type mockServerTransport struct {
 	receiver ServerReceiver
 	in       io.ReadCloser
 	out      io.Writer
@@ -24,7 +25,7 @@ type MockServerTransport struct {
 }
 
 func NewMockServerTransport(in io.ReadCloser, out io.Writer) ServerTransport {
-	return &MockServerTransport{
+	return &mockServerTransport{
 		in:     in,
 		out:    out,
 		logger: pkg.DefaultLogger,
@@ -33,7 +34,7 @@ func NewMockServerTransport(in io.ReadCloser, out io.Writer) ServerTransport {
 	}
 }
 
-func (t *MockServerTransport) Run() error {
+func (t *mockServerTransport) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.cancel = cancel
 
@@ -43,18 +44,20 @@ func (t *MockServerTransport) Run() error {
 	return nil
 }
 
-func (t *MockServerTransport) Send(_ context.Context, _ string, msg Message) error {
+func (t *mockServerTransport) Send(_ context.Context, _ string, msg Message) error {
 	if _, err := t.out.Write(append(msg, mcpMessageDelimiter)); err != nil {
 		return fmt.Errorf("failed to write: %w", err)
 	}
 	return nil
 }
 
-func (t *MockServerTransport) SetReceiver(receiver ServerReceiver) {
+func (t *mockServerTransport) SetReceiver(receiver ServerReceiver) {
 	t.receiver = receiver
 }
 
-func (t *MockServerTransport) Shutdown(userCtx context.Context, serverCtx context.Context) error {
+func (t *mockServerTransport) SetSessionManager(session.TransportSessionManager) {}
+
+func (t *mockServerTransport) Shutdown(userCtx context.Context, serverCtx context.Context) error {
 	t.cancel()
 
 	if err := t.in.Close(); err != nil {
@@ -71,7 +74,7 @@ func (t *MockServerTransport) Shutdown(userCtx context.Context, serverCtx contex
 	}
 }
 
-func (t *MockServerTransport) receive(ctx context.Context) {
+func (t *mockServerTransport) receive(ctx context.Context) {
 	s := bufio.NewScanner(t.in)
 
 	for s.Scan() {
