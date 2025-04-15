@@ -12,7 +12,8 @@ type Manager struct {
 
 	stopHeartbeat chan struct{}
 
-	detection func(ctx context.Context, sessionID string) error
+	detection   func(ctx context.Context, sessionID string) error
+	maxIdleTime time.Duration
 }
 
 func NewManager(detection func(ctx context.Context, sessionID string) error) *Manager {
@@ -20,6 +21,10 @@ func NewManager(detection func(ctx context.Context, sessionID string) error) *Ma
 		detection:     detection,
 		stopHeartbeat: make(chan struct{}),
 	}
+}
+
+func (m *Manager) SetMaxIdleTime(d time.Duration) {
+	m.maxIdleTime = d
 }
 
 func (m *Manager) CreateSession(sessionID string) {
@@ -68,7 +73,12 @@ func (m *Manager) StartHeartbeat() {
 	case <-m.stopHeartbeat:
 		return
 	case <-ticker.C:
-		m.sessions.Range(func(sessionID string, _ *State) bool {
+		now := time.Now()
+		m.sessions.Range(func(sessionID string, state *State) bool {
+			if m.maxIdleTime != 0 && now.Sub(state.LastActiveAt) > m.maxIdleTime {
+				m.CloseSession(sessionID)
+			}
+
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 

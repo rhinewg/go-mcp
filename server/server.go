@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
@@ -29,6 +30,12 @@ func WithServerInfo(serverInfo protocol.Implementation) Option {
 func WithInstructions(instructions string) Option {
 	return func(s *Server) {
 		s.instructions = instructions
+	}
+}
+
+func WithSessionMaxIdleTime(maxIdleTime time.Duration) Option {
+	return func(s *Server) {
+		s.sessionManager.SetMaxIdleTime(maxIdleTime)
 	}
 }
 
