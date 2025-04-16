@@ -95,7 +95,7 @@ func (server *Server) Run() error {
 	go func() {
 		defer pkg.Recover()
 
-		server.sessionManager.StartHeartbeat()
+		server.sessionManager.StartHeartbeatAndCleanInvalidSessions()
 	}()
 
 	if err := server.transport.Run(); err != nil {

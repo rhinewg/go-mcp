@@ -12,6 +12,8 @@ import (
 )
 
 func (server *Server) receive(_ context.Context, sessionID string, msg []byte) error {
+	server.sessionManager.UpdateSessionLastActiveAt(sessionID)
+
 	if !gjson.GetBytes(msg, "id").Exists() {
 		notify := &protocol.JSONRPCNotification{}
 		if err := pkg.JSONUnmarshal(msg, &notify); err != nil {

@@ -49,6 +49,14 @@ func (m *Manager) GetSessionSendChan(sessionID string) (chan []byte, bool) {
 	return state.SendChan, true
 }
 
+func (m *Manager) UpdateSessionLastActiveAt(sessionID string) {
+	state, ok := m.sessions.Load(sessionID)
+	if !ok {
+		return
+	}
+	state.LastActiveAt = time.Now()
+}
+
 func (m *Manager) CloseSession(sessionID string) {
 	state, ok := m.sessions.LoadAndDelete(sessionID)
 	if !ok {
@@ -58,14 +66,18 @@ func (m *Manager) CloseSession(sessionID string) {
 }
 
 func (m *Manager) CloseAllSessions() {
-	m.sessions.Range(func(sessionID string, state *State) bool {
-		m.sessions.Delete(sessionID)
+	m.sessions.Range(func(sessionID string, _ *State) bool {
+		// Here we load the session again to prevent concurrency conflicts with CloseSession, which may cause repeated close chan
+		state, ok := m.sessions.LoadAndDelete(sessionID)
+		if !ok {
+			return true
+		}
 		close(state.SendChan)
 		return true
 	})
 }
 
-func (m *Manager) StartHeartbeat() {
+func (m *Manager) StartHeartbeatAndCleanInvalidSessions() {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
@@ -77,14 +89,18 @@ func (m *Manager) StartHeartbeat() {
 		m.sessions.Range(func(sessionID string, state *State) bool {
 			if m.maxIdleTime != 0 && now.Sub(state.LastActiveAt) > m.maxIdleTime {
 				m.CloseSession(sessionID)
+				return true
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			if err := m.detection(ctx, sessionID); err != nil {
-				m.CloseSession(sessionID)
+			for i := 0; i < 3; i++ {
+				if err := m.detection(ctx, sessionID); err == nil {
+					return true
+				}
 			}
+			m.CloseSession(sessionID)
 			return true
 		})
 	}
