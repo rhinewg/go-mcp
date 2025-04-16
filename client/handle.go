@@ -19,7 +19,7 @@ func (client *Client) handleNotifyWithToolsListChanged(ctx context.Context, rawP
 			return err
 		}
 	}
-	return client.notifyHandlerWithToolsListChanged(ctx, notify)
+	return client.notifyHandler.ToolsListChanged(ctx, notify)
 }
 
 func (client *Client) handleNotifyWithPromptsListChanged(ctx context.Context, rawParams json.RawMessage) error {
@@ -29,7 +29,7 @@ func (client *Client) handleNotifyWithPromptsListChanged(ctx context.Context, ra
 			return err
 		}
 	}
-	return client.notifyHandlerWithPromptListChanged(ctx, notify)
+	return client.notifyHandler.PromptListChanged(ctx, notify)
 }
 
 func (client *Client) handleNotifyWithResourcesListChanged(ctx context.Context, rawParams json.RawMessage) error {
@@ -39,7 +39,7 @@ func (client *Client) handleNotifyWithResourcesListChanged(ctx context.Context, 
 			return err
 		}
 	}
-	return client.notifyHandlerWithResourceListChanged(ctx, notify)
+	return client.notifyHandler.ResourceListChanged(ctx, notify)
 }
 
 func (client *Client) handleNotifyWithResourcesUpdated(ctx context.Context, rawParams json.RawMessage) error {
@@ -49,5 +49,5 @@ func (client *Client) handleNotifyWithResourcesUpdated(ctx context.Context, rawP
 			return err
 		}
 	}
-	return client.notifyHandlerWithResourcesUpdated(ctx, notify)
+	return client.notifyHandler.ResourcesUpdated(ctx, notify)
 }
