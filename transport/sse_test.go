@@ -23,13 +23,13 @@ func TestSSE(t *testing.T) {
 	}
 
 	serverAddr := fmt.Sprintf("127.0.0.1:%d", port)
-	clientURL := fmt.Sprintf("http://%s/sse", serverAddr)
+	serverURL := fmt.Sprintf("http://%s/sse", serverAddr)
 
 	if svr, err = NewSSEServerTransport(serverAddr); err != nil {
 		t.Fatalf("NewSSEServerTransport failed: %v", err)
 	}
 
-	if client, err = NewSSEClientTransport(clientURL); err != nil {
+	if client, err = NewSSEClientTransport(serverURL); err != nil {
 		t.Fatalf("NewSSEClientTransport failed: %v", err)
 	}
 

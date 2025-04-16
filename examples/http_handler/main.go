@@ -39,8 +39,7 @@ func main() {
 
 	tool, err := protocol.NewTool("current time", "Get current time with timezone, Asia/Shanghai is default", currentTimeReq{})
 	if err != nil {
-		log.Fatalf("Failed to create tool: %v", err)
-		return
+		panic(fmt.Sprintf("Failed to create tool: %v", err))
 	}
 
 	mcpServer.RegisterTool(tool, currentTime)
