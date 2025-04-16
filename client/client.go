@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/bytedance/sonic"
 	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
@@ -16,27 +15,9 @@ import (
 
 type Option func(*Client)
 
-func WithToolsListChangedNotifyHandler(handler func(ctx context.Context, request *protocol.ToolListChangedNotification) error) Option {
+func WithNotifyHandler(handler NotifyHandler) Option {
 	return func(s *Client) {
-		s.notifyHandlerWithToolsListChanged = handler
-	}
-}
-
-func WithPromptListChangedNotifyHandler(handler func(ctx context.Context, request *protocol.PromptListChangedNotification) error) Option {
-	return func(s *Client) {
-		s.notifyHandlerWithPromptListChanged = handler
-	}
-}
-
-func WithResourceListChangedNotifyHandler(handler func(ctx context.Context, request *protocol.ResourceListChangedNotification) error) Option {
-	return func(s *Client) {
-		s.notifyHandlerWithResourceListChanged = handler
-	}
-}
-
-func WithResourcesUpdatedNotifyHandler(handler func(ctx context.Context, request *protocol.ResourceUpdatedNotification) error) Option {
-	return func(s *Client) {
-		s.notifyHandlerWithResourcesUpdated = handler
+		s.notifyHandler = handler
 	}
 }
 
@@ -63,10 +44,7 @@ type Client struct {
 
 	reqID2respChan cmap.ConcurrentMap[string, chan *protocol.JSONRPCResponse]
 
-	notifyHandlerWithToolsListChanged    func(ctx context.Context, request *protocol.ToolListChangedNotification) error
-	notifyHandlerWithPromptListChanged   func(ctx context.Context, request *protocol.PromptListChangedNotification) error
-	notifyHandlerWithResourceListChanged func(ctx context.Context, request *protocol.ResourceListChangedNotification) error
-	notifyHandlerWithResourcesUpdated    func(ctx context.Context, request *protocol.ResourceUpdatedNotification) error
+	notifyHandler NotifyHandler
 
 	requestID int64
 
@@ -100,28 +78,10 @@ func NewClient(t transport.ClientTransport, opts ...Option) (*Client, error) {
 		opt(client)
 	}
 
-	if client.notifyHandlerWithToolsListChanged == nil {
-		client.notifyHandlerWithToolsListChanged = func(_ context.Context, notify *protocol.ToolListChangedNotification) error {
-			return defaultNotifyHandler(client.logger, notify)
-		}
-	}
-
-	if client.notifyHandlerWithPromptListChanged == nil {
-		client.notifyHandlerWithPromptListChanged = func(_ context.Context, notify *protocol.PromptListChangedNotification) error {
-			return defaultNotifyHandler(client.logger, notify)
-		}
-	}
-
-	if client.notifyHandlerWithResourceListChanged == nil {
-		client.notifyHandlerWithResourceListChanged = func(_ context.Context, notify *protocol.ResourceListChangedNotification) error {
-			return defaultNotifyHandler(client.logger, notify)
-		}
-	}
-
-	if client.notifyHandlerWithResourcesUpdated == nil {
-		client.notifyHandlerWithResourcesUpdated = func(_ context.Context, notify *protocol.ResourceUpdatedNotification) error {
-			return defaultNotifyHandler(client.logger, notify)
-		}
+	if client.notifyHandler == nil {
+		h := NewBaseNotifyHandler()
+		h.Logger = client.logger
+		client.notifyHandler = h
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), client.initTimeout)
@@ -167,14 +127,5 @@ func (client *Client) Close() error {
 	if err := client.transport.Close(); err != nil {
 		return err
 	}
-	return nil
-}
-
-func defaultNotifyHandler(logger pkg.Logger, notify interface{}) error {
-	b, err := sonic.Marshal(notify)
-	if err != nil {
-		return err
-	}
-	logger.Infof("receive notify: %+v", b)
 	return nil
 }
