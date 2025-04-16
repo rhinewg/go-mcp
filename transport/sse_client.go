@@ -42,7 +42,7 @@ type sseClientTransport struct {
 
 	endpointChan    chan struct{}
 	messageEndpoint *url.URL
-	receiver        ClientReceiver
+	receiver        clientReceiver
 
 	// options
 	logger         pkg.Logger
@@ -236,7 +236,7 @@ func (t *sseClientTransport) Send(ctx context.Context, msg Message) error {
 	return nil
 }
 
-func (t *sseClientTransport) SetReceiver(receiver ClientReceiver) {
+func (t *sseClientTransport) SetReceiver(receiver clientReceiver) {
 	t.receiver = receiver
 }
 

@@ -2,9 +2,8 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-
-	"github.com/bytedance/sonic"
 
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 )
@@ -18,7 +17,7 @@ func (server *Server) sendMsgWithRequest(ctx context.Context, sessionID string, 
 
 	req := protocol.NewJSONRPCRequest(requestID, method, params)
 
-	message, err := sonic.Marshal(req)
+	message, err := json.Marshal(req)
 	if err != nil {
 		return err
 	}
@@ -32,7 +31,7 @@ func (server *Server) sendMsgWithRequest(ctx context.Context, sessionID string, 
 func (server *Server) sendMsgWithResponse(ctx context.Context, sessionID string, requestID protocol.RequestID, result protocol.ServerResponse) error {
 	resp := protocol.NewJSONRPCSuccessResponse(requestID, result)
 
-	message, err := sonic.Marshal(resp)
+	message, err := json.Marshal(resp)
 	if err != nil {
 		return err
 	}
@@ -46,7 +45,7 @@ func (server *Server) sendMsgWithResponse(ctx context.Context, sessionID string,
 func (server *Server) sendMsgWithNotification(ctx context.Context, sessionID string, method protocol.Method, params protocol.ServerNotify) error {
 	notify := protocol.NewJSONRPCNotification(method, params)
 
-	message, err := sonic.Marshal(notify)
+	message, err := json.Marshal(notify)
 	if err != nil {
 		return err
 	}
@@ -64,7 +63,7 @@ func (server *Server) sendMsgWithError(ctx context.Context, sessionID string, re
 
 	resp := protocol.NewJSONRPCErrorResponse(requestID, code, msg)
 
-	message, err := sonic.Marshal(resp)
+	message, err := json.Marshal(resp)
 	if err != nil {
 		return err
 	}

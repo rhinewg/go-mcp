@@ -26,13 +26,13 @@ type ClientTransport interface {
 	Send(ctx context.Context, msg Message) error
 
 	// SetReceiver sets the handler for messages from the peer
-	SetReceiver(receiver ClientReceiver)
+	SetReceiver(receiver clientReceiver)
 
 	// Close terminates the transport connection
 	Close() error
 }
 
-type ClientReceiver interface {
+type clientReceiver interface {
 	Receive(ctx context.Context, msg []byte) error
 }
 
@@ -50,7 +50,9 @@ type ServerTransport interface {
 	Send(ctx context.Context, sessionID string, msg Message) error
 
 	// SetReceiver sets the handler for messages from the peer
-	SetReceiver(ServerReceiver)
+	SetReceiver(serverReceiver)
+
+	SetSessionManager(manager sessionManager)
 
 	// Shutdown gracefully closes, the internal implementation needs to stop receiving messages first,
 	// then wait for serverCtx to be canceled, while using userCtx to control timeout.
@@ -64,7 +66,7 @@ type ServerTransport interface {
 	Shutdown(userCtx context.Context, serverCtx context.Context) error
 }
 
-type ServerReceiver interface {
+type serverReceiver interface {
 	Receive(ctx context.Context, sessionID string, msg []byte) error
 }
 
@@ -72,4 +74,12 @@ type ServerReceiverF func(ctx context.Context, sessionID string, msg []byte) err
 
 func (f ServerReceiverF) Receive(ctx context.Context, sessionID string, msg []byte) error {
 	return f(ctx, sessionID, msg)
+}
+
+type sessionManager interface {
+	CreateSession(sessionID string)
+	SendMessage(ctx context.Context, sessionID string, message []byte) error
+	GetMessageForSend(ctx context.Context, sessionID string) ([]byte, error)
+	CloseSession(sessionID string)
+	CloseAllSessions()
 }

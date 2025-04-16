@@ -24,12 +24,12 @@ func (server *Server) handleRequestWithInitialize(sessionID string, rawParams js
 		return nil, fmt.Errorf("protocol version not supported, supported version is %v", protocol.Version)
 	}
 
-	s := newSession()
-	s.clientInfo = &request.ClientInfo
-	s.clientCapabilities = &request.Capabilities
-	s.receiveInitRequest.Store(true)
-
-	server.sessionID2session.Store(sessionID, s)
+	s, ok := server.sessionManager.GetSession(sessionID)
+	if !ok {
+		return nil, pkg.ErrLackSession
+	}
+	s.SetClientInfo(&request.ClientInfo, &request.Capabilities)
+	s.SetReceivedInitRequest()
 
 	return &protocol.InitializeResult{
 		ServerInfo:      *server.serverInfo,
@@ -173,11 +173,11 @@ func (server *Server) handleRequestWithSubscribeResourceChange(sessionID string,
 		return nil, err
 	}
 
-	s, ok := server.sessionID2session.Load(sessionID)
+	s, ok := server.sessionManager.GetSession(sessionID)
 	if !ok {
 		return nil, pkg.ErrLackSession
 	}
-	s.subscribedResources.Set(request.URI, struct{}{})
+	s.GetSubscribedResources().Set(request.URI, struct{}{})
 	return protocol.NewSubscribeResult(), nil
 }
 
@@ -191,11 +191,11 @@ func (server *Server) handleRequestWithUnSubscribeResourceChange(sessionID strin
 		return nil, err
 	}
 
-	s, ok := server.sessionID2session.Load(sessionID)
+	s, ok := server.sessionManager.GetSession(sessionID)
 	if !ok {
 		return nil, pkg.ErrLackSession
 	}
-	s.subscribedResources.Remove(request.URI)
+	s.GetSubscribedResources().Remove(request.URI)
 	return protocol.NewUnsubscribeResult(), nil
 }
 
@@ -246,14 +246,14 @@ func (server *Server) handleNotifyWithInitialized(sessionID string, rawParams js
 		}
 	}
 
-	s, ok := server.sessionID2session.Load(sessionID)
+	s, ok := server.sessionManager.GetSession(sessionID)
 	if !ok {
 		return pkg.ErrLackSession
 	}
 
-	if !s.receiveInitRequest.Load().(bool) {
+	if !s.GetReceivedInitRequest() {
 		return fmt.Errorf("the server has not received the client's initialization request")
 	}
-	s.ready.Store(true)
+	s.SetReady()
 	return nil
 }
