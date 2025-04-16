@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"testing"
+	"time"
 )
 
 type mock struct {
@@ -41,7 +42,9 @@ func TestStdioTransport(t *testing.T) {
 		client *stdioClientTransport
 	)
 
-	mockServerTrPath := filepath.Join(os.TempDir(), "mock_server_tr_"+strconv.Itoa(rand.Int()))
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	mockServerTrPath := filepath.Join(os.TempDir(), "mock_server_tr_"+strconv.Itoa(r.Int()))
 	if err = compileMockStdioServerTr(mockServerTrPath); err != nil {
 		t.Fatalf("Failed to compile mock server: %v", err)
 	}

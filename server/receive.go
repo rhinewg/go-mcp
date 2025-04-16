@@ -12,7 +12,9 @@ import (
 )
 
 func (server *Server) receive(_ context.Context, sessionID string, msg []byte) error {
-	server.sessionManager.UpdateSessionLastActiveAt(sessionID)
+	if !server.sessionManager.IsExistSession(sessionID) {
+		return pkg.ErrLackSession
+	}
 
 	if !gjson.GetBytes(msg, "id").Exists() {
 		notify := &protocol.JSONRPCNotification{}
@@ -64,10 +66,11 @@ func (server *Server) receive(_ context.Context, sessionID string, msg []byte) e
 		return pkg.ErrRequestInvalid
 	}
 	server.inFlyRequest.Add(1)
-	if server.inShutdown.Load().(bool) {
+	if server.inShutdown.Load() {
 		defer server.inFlyRequest.Done()
 		return errors.New("server already shutdown")
 	}
+
 	go func() {
 		defer pkg.Recover()
 		defer server.inFlyRequest.Done()
@@ -86,9 +89,13 @@ func (server *Server) receiveRequest(sessionID string, request *protocol.JSONRPC
 	if request.Method != protocol.Initialize && request.Method != protocol.Ping {
 		if s, ok := server.sessionManager.GetSession(sessionID); !ok {
 			return pkg.ErrLackSession
-		} else if !s.Ready.Load().(bool) {
+		} else if !s.GetReady() {
 			return pkg.ErrSessionHasNotInitialized
 		}
+	}
+
+	if request.Method != protocol.Ping {
+		server.sessionManager.UpdateSessionLastActiveAt(sessionID)
 	}
 
 	var (
@@ -143,7 +150,7 @@ func (server *Server) receiveRequest(sessionID string, request *protocol.JSONRPC
 func (server *Server) receiveNotify(sessionID string, notify *protocol.JSONRPCNotification) error {
 	if s, ok := server.sessionManager.GetSession(sessionID); !ok {
 		return pkg.ErrLackSession
-	} else if !s.Ready.Load().(bool) && notify.Method != protocol.NotificationInitialized {
+	} else if !s.GetReady() && notify.Method != protocol.NotificationInitialized {
 		return pkg.ErrSessionHasNotInitialized
 	}
 
@@ -160,11 +167,11 @@ func (server *Server) receiveResponse(sessionID string, response *protocol.JSONR
 	if !ok {
 		return pkg.ErrLackSession
 	}
-	if !s.Ready.Load().(bool) {
+	if !s.GetReady() {
 		return pkg.ErrSessionHasNotInitialized
 	}
 
-	respChan, ok := s.ReqID2respChan.Get(fmt.Sprint(response.ID))
+	respChan, ok := s.GetReqID2respChan().Get(fmt.Sprint(response.ID))
 	if !ok {
 		return fmt.Errorf("%w: sessionID=%+v, requestID=%+v", pkg.ErrLackResponseChan, sessionID, response.ID)
 	}

@@ -32,6 +32,11 @@ func (m *Manager) CreateSession(sessionID string) {
 	m.sessions.Store(sessionID, state)
 }
 
+func (m *Manager) IsExistSession(sessionID string) bool {
+	_, has := m.sessions.Load(sessionID)
+	return has
+}
+
 func (m *Manager) GetSession(sessionID string) (*State, bool) {
 	state, has := m.sessions.Load(sessionID)
 	if !has {
@@ -40,13 +45,20 @@ func (m *Manager) GetSession(sessionID string) (*State, bool) {
 	return state, true
 }
 
-func (m *Manager) GetSessionSendChan(sessionID string) (chan []byte, bool) {
+func (m *Manager) SendMessage(ctx context.Context, sessionID string, message []byte) error {
 	state, has := m.GetSession(sessionID)
 	if !has {
-		return nil, false
+		return pkg.ErrLackSession
 	}
+	return state.sendMessage(ctx, message)
+}
 
-	return state.SendChan, true
+func (m *Manager) GetMessageForSend(ctx context.Context, sessionID string) ([]byte, error) {
+	state, has := m.GetSession(sessionID)
+	if !has {
+		return nil, pkg.ErrLackSession
+	}
+	return state.getMessageForSend(ctx)
 }
 
 func (m *Manager) UpdateSessionLastActiveAt(sessionID string) {
@@ -54,7 +66,7 @@ func (m *Manager) UpdateSessionLastActiveAt(sessionID string) {
 	if !ok {
 		return
 	}
-	state.LastActiveAt = time.Now()
+	state.updateLastActiveAt()
 }
 
 func (m *Manager) CloseSession(sessionID string) {
@@ -62,7 +74,7 @@ func (m *Manager) CloseSession(sessionID string) {
 	if !ok {
 		return
 	}
-	close(state.SendChan)
+	state.Close()
 }
 
 func (m *Manager) CloseAllSessions() {
@@ -72,7 +84,7 @@ func (m *Manager) CloseAllSessions() {
 		if !ok {
 			return true
 		}
-		close(state.SendChan)
+		state.Close()
 		return true
 	})
 }
@@ -87,7 +99,7 @@ func (m *Manager) StartHeartbeatAndCleanInvalidSessions() {
 	case <-ticker.C:
 		now := time.Now()
 		m.sessions.Range(func(sessionID string, state *State) bool {
-			if m.maxIdleTime != 0 && now.Sub(state.LastActiveAt) > m.maxIdleTime {
+			if m.maxIdleTime != 0 && now.Sub(state.lastActiveAt) > m.maxIdleTime {
 				m.CloseSession(sessionID)
 				return true
 			}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
@@ -55,7 +54,7 @@ type Server struct {
 
 	sessionManager *session.Manager
 
-	inShutdown   atomic.Value // true when server is in shutdown
+	inShutdown   *pkg.AtomicBool // true when server is in shutdown
 	inFlyRequest sync.WaitGroup
 
 	capabilities *protocol.ServerCapabilities
@@ -73,7 +72,7 @@ func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
 			Resources: &protocol.ResourcesCapability{ListChanged: true, Subscribe: true},
 			Tools:     &protocol.ToolsCapability{ListChanged: true},
 		},
-		inShutdown: *pkg.NewBoolAtomic(),
+		inShutdown: pkg.NewAtomicBool(),
 		serverInfo: &protocol.Implementation{},
 		logger:     pkg.DefaultLogger,
 	}
@@ -215,8 +214,6 @@ func (server *Server) UnregisterResourceTemplate(uriTemplate string) {
 }
 
 func (server *Server) Shutdown(userCtx context.Context) error {
-	defer server.sessionManager.StopHeartbeat()
-
 	server.inShutdown.Store(true)
 
 	serverCtx, cancel := context.WithCancel(userCtx)
@@ -229,11 +226,13 @@ func (server *Server) Shutdown(userCtx context.Context) error {
 		cancel()
 	}()
 
+	server.sessionManager.StopHeartbeat()
+
 	return server.transport.Shutdown(userCtx, serverCtx)
 }
 
 func (server *Server) sessionDetection(ctx context.Context, sessionID string) error {
-	if server.inShutdown.Load().(bool) {
+	if server.inShutdown.Load() {
 		return nil
 	}
 

@@ -2,11 +2,10 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"sync/atomic"
 	"time"
 
-	"github.com/bytedance/sonic"
 	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
@@ -70,7 +69,7 @@ type Client struct {
 
 	requestID int64
 
-	ready atomic.Value
+	ready *pkg.AtomicBool
 
 	clientInfo         *protocol.Implementation
 	clientCapabilities *protocol.ClientCapabilities
@@ -81,6 +80,8 @@ type Client struct {
 
 	initTimeout time.Duration
 
+	closed chan struct{}
+
 	logger pkg.Logger
 }
 
@@ -88,10 +89,11 @@ func NewClient(t transport.ClientTransport, opts ...Option) (*Client, error) {
 	client := &Client{
 		transport:          t,
 		reqID2respChan:     cmap.New[chan *protocol.JSONRPCResponse](),
-		ready:              *pkg.NewBoolAtomic(),
+		ready:              pkg.NewAtomicBool(),
 		clientInfo:         &protocol.Implementation{},
 		clientCapabilities: &protocol.ClientCapabilities{},
 		initTimeout:        time.Second * 30,
+		closed:             make(chan struct{}),
 		logger:             pkg.DefaultLogger,
 	}
 	t.SetReceiver(transport.ClientReceiverF(client.receive))
@@ -141,7 +143,10 @@ func NewClient(t transport.ClientTransport, opts ...Option) (*Client, error) {
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
 
-		for range ticker.C {
+		select {
+		case <-client.closed:
+			return
+		case <-ticker.C:
 			if _, err := client.Ping(ctx, protocol.NewPingRequest()); err != nil {
 				client.logger.Warnf("mcp client ping server fail: %v", err)
 			}
@@ -164,14 +169,13 @@ func (client *Client) GetServerInstructions() string {
 }
 
 func (client *Client) Close() error {
-	if err := client.transport.Close(); err != nil {
-		return err
-	}
-	return nil
+	close(client.closed)
+
+	return client.transport.Close()
 }
 
 func defaultNotifyHandler(logger pkg.Logger, notify interface{}) error {
-	b, err := sonic.Marshal(notify)
+	b, err := json.Marshal(notify)
 	if err != nil {
 		return err
 	}

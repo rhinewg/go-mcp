@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -186,17 +187,7 @@ func (t *sseServerTransport) Send(ctx context.Context, sessionID string, msg Mes
 	default:
 	}
 
-	ch, ok := t.sessionManager.GetSessionSendChan(sessionID)
-	if !ok {
-		return pkg.ErrLackSession
-	}
-
-	select {
-	case ch <- msg:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	return t.sessionManager.SendMessage(ctx, sessionID, msg)
 }
 
 func (t *sseServerTransport) SetReceiver(receiver serverReceiver) {
@@ -212,7 +203,7 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 	defer pkg.Recover()
 
 	//nolint:govet // Ignore error since we're just logging
-	ctx := r.Context()
+	requestCtx := r.Context()
 	// Set headers for SSE
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -231,39 +222,30 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 	t.sessionManager.CreateSession(sessionID)
 	defer t.sessionManager.CloseSession(sessionID)
 
-	sessionChan, ok := t.sessionManager.GetSessionSendChan(sessionID)
-	if !ok {
-		http.Error(w, "Session lost", http.StatusInternalServerError)
-	}
-
 	uri := fmt.Sprintf("%s?sessionID=%s", t.messageEndpointURL, sessionID)
 	// Send the initial endpoint event
-	_, err := fmt.Fprintf(w, "event: endpoint\ndata: %s\n\n", uri)
-	if err != nil {
+	if _, err := fmt.Fprintf(w, "event: endpoint\ndata: %s\n\n", uri); err != nil {
 		t.logger.Errorf("send endpoint message fail")
 		return
 	}
 	flusher.Flush()
 
 	for {
-		select {
-		case <-ctx.Done():
-			t.logger.Debugf("sse connect request canceled: %+v, sessionID=%s", ctx.Err(), sessionID)
+		msg, err := t.sessionManager.GetMessageForSend(requestCtx, sessionID)
+		if err != nil {
+			if !errors.Is(err, pkg.ErrSendEOF) {
+				t.logger.Debugf("sse connect request err: %+v, sessionID=%s", err.Error(), sessionID)
+			}
 			return
-		case msg, ok := <-sessionChan:
-			t.logger.Debugf("Sending message: %s", string(msg))
-
-			if msg == nil && !ok { // There are no new messages and the chan has been closed, indicating that the request may need to be terminated.
-				return
-			}
-
-			_, err := fmt.Fprintf(w, "event: message\ndata: %s\n\n", msg)
-			if err != nil {
-				t.logger.Errorf("Failed to write message: %v", err)
-				continue
-			}
-			flusher.Flush()
 		}
+
+		t.logger.Debugf("Sending message: %s", string(msg))
+
+		if _, err = fmt.Fprintf(w, "event: message\ndata: %s\n\n", msg); err != nil {
+			t.logger.Errorf("Failed to write message: %v", err)
+			continue
+		}
+		flusher.Flush()
 	}
 }
 
@@ -282,12 +264,6 @@ func (t *sseServerTransport) handleMessage(w http.ResponseWriter, r *http.Reques
 	sessionID := r.URL.Query().Get("sessionID")
 	if sessionID == "" {
 		t.writeError(w, http.StatusBadRequest, "Missing session ID")
-		return
-	}
-
-	_, ok := t.sessionManager.GetSessionSendChan(sessionID)
-	if !ok {
-		t.writeError(w, http.StatusBadRequest, "Invalid session ID")
 		return
 	}
 

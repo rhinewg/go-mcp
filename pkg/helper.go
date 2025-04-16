@@ -5,7 +5,6 @@ import (
 	"log"
 	"runtime/debug"
 	"strings"
-	"sync/atomic"
 	"unsafe"
 )
 
@@ -35,10 +34,4 @@ func JoinErrors(errs []error) error {
 		messages[i] = err.Error()
 	}
 	return errors.New(strings.Join(messages, "; "))
-}
-
-func NewBoolAtomic() *atomic.Value {
-	v := &atomic.Value{}
-	v.Store(false)
-	return v
 }

@@ -27,7 +27,7 @@ func test(t *testing.T, runServer func() error, transportClient transport.Client
 	select {
 	case err := <-errCh:
 		t.Fatalf("server.Run() failed: %v", err)
-	case <-time.After(time.Second * 2):
+	case <-time.After(time.Second * 5):
 		// Server started normally
 	}
 
@@ -68,7 +68,9 @@ func test(t *testing.T, runServer func() error, transportClient transport.Client
 }
 
 func compileMockStdioServerTr() (string, error) {
-	mockServerTrPath := filepath.Join(os.TempDir(), "mock_server_tr_"+strconv.Itoa(rand.Int()))
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	mockServerTrPath := filepath.Join(os.TempDir(), "mock_server_tr_"+strconv.Itoa(r.Int()))
 
 	cmd := exec.Command("go", "build", "-o", mockServerTrPath, "../examples/everything/main.go")
 

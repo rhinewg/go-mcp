@@ -2,10 +2,9 @@ package transport
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
@@ -22,8 +21,41 @@ func (m *mockSessionManager) CreateSession(sessionID string) {
 	m.Store(sessionID, make(chan []byte))
 }
 
-func (m *mockSessionManager) GetSessionSendChan(sessionID string) (chan []byte, bool) {
-	return m.Load(sessionID)
+func (m *mockSessionManager) IsExistSession(sessionID string) bool {
+	_, has := m.Load(sessionID)
+	return has
+}
+
+func (m *mockSessionManager) SendMessage(ctx context.Context, sessionID string, message []byte) error {
+	ch, has := m.Load(sessionID)
+	if !has {
+		return pkg.ErrLackSession
+	}
+
+	select {
+	case ch <- message:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (m *mockSessionManager) GetMessageForSend(ctx context.Context, sessionID string) ([]byte, error) {
+	ch, has := m.Load(sessionID)
+	if !has {
+		return nil, pkg.ErrLackSession
+	}
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case msg, ok := <-ch:
+		if msg == nil && !ok {
+			// There are no new messages and the chan has been closed, indicating that the request may need to be terminated.
+			return nil, pkg.ErrSendEOF
+		}
+		return msg, nil
+	}
 }
 
 func (m *mockSessionManager) CloseSession(sessionID string) {
@@ -100,7 +132,10 @@ func testTransport(t *testing.T, client ClientTransport, server ServerTransport)
 	if err := client.Send(context.Background(), Message(msgWithServer)); err != nil {
 		t.Fatalf("client.Send() failed: %v", err)
 	}
-	assert.Equal(t, <-expectedMsgWithServerCh, msgWithServer)
+	expectedMsg := <-expectedMsgWithServerCh
+	if !reflect.DeepEqual(expectedMsg, msgWithServer) {
+		t.Fatalf("client.Send() got %v, want %v", expectedMsg, msgWithServer)
+	}
 
 	sessionID := ""
 	if cli, ok := client.(*sseClientTransport); ok {
@@ -110,5 +145,9 @@ func testTransport(t *testing.T, client ClientTransport, server ServerTransport)
 	if err := server.Send(context.Background(), sessionID, Message(msgWithClient)); err != nil {
 		t.Fatalf("server.Send() failed: %v", err)
 	}
-	assert.Equal(t, <-expectedMsgWithClientCh, msgWithClient)
+
+	expectedMsg = <-expectedMsgWithClientCh
+	if !reflect.DeepEqual(expectedMsg, msgWithClient) {
+		t.Fatalf("server.Send() failed: got %v, want %v", expectedMsg, msgWithClient)
+	}
 }

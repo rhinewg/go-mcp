@@ -28,9 +28,8 @@ func (server *Server) handleRequestWithInitialize(sessionID string, rawParams js
 	if !ok {
 		return nil, pkg.ErrLackSession
 	}
-	s.ClientInfo = &request.ClientInfo
-	s.ClientCapabilities = &request.Capabilities
-	s.ReceiveInitRequest.Store(true)
+	s.SetClientInfo(&request.ClientInfo, &request.Capabilities)
+	s.SetReceivedInitRequest()
 
 	return &protocol.InitializeResult{
 		ServerInfo:      *server.serverInfo,
@@ -178,7 +177,7 @@ func (server *Server) handleRequestWithSubscribeResourceChange(sessionID string,
 	if !ok {
 		return nil, pkg.ErrLackSession
 	}
-	s.SubscribedResources.Set(request.URI, struct{}{})
+	s.GetSubscribedResources().Set(request.URI, struct{}{})
 	return protocol.NewSubscribeResult(), nil
 }
 
@@ -196,7 +195,7 @@ func (server *Server) handleRequestWithUnSubscribeResourceChange(sessionID strin
 	if !ok {
 		return nil, pkg.ErrLackSession
 	}
-	s.SubscribedResources.Remove(request.URI)
+	s.GetSubscribedResources().Remove(request.URI)
 	return protocol.NewUnsubscribeResult(), nil
 }
 
@@ -252,9 +251,9 @@ func (server *Server) handleNotifyWithInitialized(sessionID string, rawParams js
 		return pkg.ErrLackSession
 	}
 
-	if !s.ReceiveInitRequest.Load().(bool) {
+	if !s.GetReceivedInitRequest() {
 		return fmt.Errorf("the server has not received the client's initialization request")
 	}
-	s.Ready.Store(true)
+	s.SetReady()
 	return nil
 }

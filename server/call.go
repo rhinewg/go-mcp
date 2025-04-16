@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"sync/atomic"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
@@ -83,7 +82,7 @@ func (server *Server) SendNotification4ResourcesUpdated(ctx context.Context, not
 
 	var errList []error
 	server.sessionManager.RangeSessions(func(sessionID string, s *session.State) bool {
-		if _, ok := s.SubscribedResources.Get(notify.URI); !ok {
+		if _, ok := s.GetSubscribedResources().Get(notify.URI); !ok {
 			return true
 		}
 
@@ -102,15 +101,15 @@ func (server *Server) callClient(ctx context.Context, sessionID string, method p
 		return nil, pkg.ErrLackSession
 	}
 
-	requestID := strconv.FormatInt(atomic.AddInt64(&session.RequestID, 1), 10)
+	requestID := strconv.FormatInt(session.IncRequestID(), 10)
 	if err := server.sendMsgWithRequest(ctx, sessionID, requestID, method, params); err != nil {
 		return nil, err
 	}
 
 	respChan := make(chan *protocol.JSONRPCResponse, 1)
 
-	session.ReqID2respChan.Set(requestID, respChan)
-	defer session.ReqID2respChan.Remove(requestID)
+	session.GetReqID2respChan().Set(requestID, respChan)
+	defer session.GetReqID2respChan().Remove(requestID)
 
 	select {
 	case <-ctx.Done():
