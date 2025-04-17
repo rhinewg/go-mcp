@@ -93,28 +93,27 @@ func (m *Manager) StartHeartbeatAndCleanInvalidSessions() {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
-	select {
-	case <-m.stopHeartbeat:
-		return
-	case <-ticker.C:
-		now := time.Now()
-		m.sessions.Range(func(sessionID string, state *State) bool {
-			if m.maxIdleTime != 0 && now.Sub(state.lastActiveAt) > m.maxIdleTime {
-				m.CloseSession(sessionID)
-				return true
-			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-
-			for i := 0; i < 3; i++ {
-				if err := m.detection(ctx, sessionID); err == nil {
+	for {
+		select {
+		case <-m.stopHeartbeat:
+			return
+		case <-ticker.C:
+			now := time.Now()
+			m.sessions.Range(func(sessionID string, state *State) bool {
+				if m.maxIdleTime != 0 && now.Sub(state.lastActiveAt) > m.maxIdleTime {
+					m.CloseSession(sessionID)
 					return true
 				}
-			}
-			m.CloseSession(sessionID)
-			return true
-		})
+
+				for i := 0; i < 3; i++ {
+					if err := m.detection(context.Background(), sessionID); err == nil {
+						return true
+					}
+				}
+				m.CloseSession(sessionID)
+				return true
+			})
+		}
 	}
 }
 

@@ -103,14 +103,12 @@ func NewClient(t transport.ClientTransport, opts ...Option) (*Client, error) {
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
 
-		select {
-		case <-client.closed:
-			return
-		case <-ticker.C:
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-			defer cancel()
-			if _, err := client.Ping(ctx, protocol.NewPingRequest()); err != nil {
-				client.logger.Warnf("mcp client ping server fail: %v", err)
+		for {
+			select {
+			case <-client.closed:
+				return
+			case <-ticker.C:
+				client.sessionDetection()
 			}
 		}
 	}()
@@ -134,4 +132,13 @@ func (client *Client) Close() error {
 	close(client.closed)
 
 	return client.transport.Close()
+}
+
+func (client *Client) sessionDetection() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if _, err := client.Ping(ctx, protocol.NewPingRequest()); err != nil {
+		client.logger.Warnf("mcp client ping server fail: %v", err)
+	}
 }
