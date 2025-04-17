@@ -94,6 +94,28 @@ func (r *CallToolRequest) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (r *CallToolRequest) MarshalJSON() ([]byte, error) {
+	type alias CallToolRequest
+	temp := &struct {
+		Arguments json.RawMessage `json:"arguments,omitempty"`
+		*alias
+	}{
+		alias: (*alias)(r),
+	}
+
+	if len(r.RawArguments) > 0 {
+		temp.Arguments = r.RawArguments
+	} else if r.Arguments != nil {
+		var err error
+		temp.Arguments, err = json.Marshal(r.Arguments)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return json.Marshal(temp)
+}
+
 // CallToolResult represents the response to a tool call
 type CallToolResult struct {
 	Content []Content `json:"content"`
@@ -187,6 +209,13 @@ func NewCallToolRequest(name string, arguments map[string]interface{}) *CallTool
 	return &CallToolRequest{
 		Name:      name,
 		Arguments: arguments,
+	}
+}
+
+func NewCallToolRequestWithRawArguments(name string, rawArguments json.RawMessage) *CallToolRequest {
+	return &CallToolRequest{
+		Name:         name,
+		RawArguments: rawArguments,
 	}
 }
 
