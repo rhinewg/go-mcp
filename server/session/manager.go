@@ -105,11 +105,8 @@ func (m *Manager) StartHeartbeatAndCleanInvalidSessions() {
 					return true
 				}
 
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-
 				for i := 0; i < 3; i++ {
-					if err := m.detection(ctx, sessionID); err == nil {
+					if err := m.detection(context.Background(), sessionID); err == nil {
 						return true
 					}
 				}

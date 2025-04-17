@@ -135,7 +135,7 @@ func (client *Client) Close() error {
 }
 
 func (client *Client) sessionDetection() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if _, err := client.Ping(ctx, protocol.NewPingRequest()); err != nil {
