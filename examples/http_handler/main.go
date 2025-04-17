@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -39,19 +40,27 @@ func main() {
 
 	tool, err := protocol.NewTool("current time", "Get current time with timezone, Asia/Shanghai is default", currentTimeReq{})
 	if err != nil {
-		log.Fatalf("Failed to create tool: %v", err)
-		return
+		panic(fmt.Sprintf("Failed to create tool: %v", err))
 	}
 
 	mcpServer.RegisterTool(tool, currentTime)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/sse", mcpHandler.HandleSSE().ServeHTTP)
-	mux.HandleFunc(messageEndpointURL, mcpHandler.HandleMessage().ServeHTTP)
+	router := http.NewServeMux()
+	router.HandleFunc("/sse", mcpHandler.HandleSSE().ServeHTTP)
+	router.HandleFunc(messageEndpointURL, mcpHandler.HandleMessage().ServeHTTP)
+
+	// Can be replaced by using gin framework
+	// router := gin.Default()
+	// router.GET("/sse", func(ctx *gin.Context) {
+	// 	mcpHandler.HandleSSE().ServeHTTP(ctx.Writer, ctx.Request)
+	// })
+	// router.POST(messageEndpointURL, func(ctx *gin.Context) {
+	// 	mcpHandler.HandleMessage().ServeHTTP(ctx.Writer, ctx.Request)
+	// })
 
 	httpServer := &http.Server{
 		Addr:        ":8080",
-		Handler:     mux,
+		Handler:     router,
 		IdleTimeout: time.Minute,
 	}
 
@@ -61,7 +70,9 @@ func main() {
 	}()
 
 	go func() {
-		errCh <- httpServer.ListenAndServe()
+		if err = httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
 	}()
 
 	if err = signalWaiter(errCh); err != nil {
