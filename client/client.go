@@ -107,6 +107,8 @@ func NewClient(t transport.ClientTransport, opts ...Option) (*Client, error) {
 		case <-client.closed:
 			return
 		case <-ticker.C:
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cancel()
 			if _, err := client.Ping(ctx, protocol.NewPingRequest()); err != nil {
 				client.logger.Warnf("mcp client ping server fail: %v", err)
 			}

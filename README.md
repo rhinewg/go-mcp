@@ -152,6 +152,57 @@ func handleTimeRequest(req *protocol.CallToolRequest) (*protocol.CallToolResult,
 }
 ```
 
+### Integration With Gin Server
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+
+	"github.com/ThinkInAIXYZ/go-mcp/protocol"
+	"github.com/ThinkInAIXYZ/go-mcp/server"
+	"github.com/ThinkInAIXYZ/go-mcp/transport"
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	messageEndpointURL := "/message"
+
+	sseTransport, mcpHandler, err := transport.NewSSEServerTransportAndHandler(messageEndpointURL)
+	if err != nil {
+		log.Panicf("new sse transport and hander with error: %v", err)
+	}
+
+	// new mcp server
+	mcpServer, _ := server.NewServer(sseTransport)
+
+	// register tool with mcpServer
+	// mcpServer.RegisterTool(tool, toolHandler)
+
+	// start mcp Server
+	go func() {
+		mcpServer.Run()
+	}()
+
+	defer mcpServer.Shutdown(context.Background())
+
+	r := gin.Default()
+	r.GET("/sse", func(ctx *gin.Context) {
+		mcpHandler.HandleSSE().ServeHTTP(ctx.Writer, ctx.Request)
+	})
+	r.POST(messageEndpointURL, func(ctx *gin.Context) {
+		mcpHandler.HandleMessage().ServeHTTP(ctx.Writer, ctx.Request)
+	})
+
+	if err = r.Run(":8080"); err != nil {
+		return
+	}
+}
+```
+[Reference：A more complete example](https://github.com/ThinkInAIXYZ/go-mcp/blob/main/examples/http_handler/main.go)
+
 ## 🏗️ Architecture Design
 
 Go-MCP adopts an elegant three-layer architecture:
