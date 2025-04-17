@@ -11,6 +11,10 @@ import (
 )
 
 func VerifyAndUnmarshal(content json.RawMessage, v any) error {
+	if len(content) == 0 {
+		return fmt.Errorf("request arguments is empty")
+	}
+
 	t := reflect.TypeOf(v)
 	for t.Kind() != reflect.Struct {
 		if t.Kind() != reflect.Ptr {

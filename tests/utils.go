@@ -57,9 +57,7 @@ func test(t *testing.T, runServer func() error, transportClient transport.Client
 	// Call tool
 	callResult, err := mcpClient.CallTool(
 		context.Background(),
-		protocol.NewCallToolRequest("current time", map[string]interface{}{
-			"timezone": "UTC",
-		}))
+		protocol.NewCallToolRequestWithRawArguments("current time", json.RawMessage(`{"timezone": "UTC"}`)))
 	if err != nil {
 		t.Fatalf("Failed to call tool: %v", err)
 	}
