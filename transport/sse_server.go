@@ -218,7 +218,7 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	// Create an SSE connection
-	sessionID := uuid.New().String()
+	sessionID := uuid.NewString()
 	t.sessionManager.CreateSession(sessionID)
 	defer t.sessionManager.CloseSession(sessionID)
 
