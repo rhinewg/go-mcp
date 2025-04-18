@@ -167,9 +167,6 @@ func (server *Server) receiveResponse(sessionID string, response *protocol.JSONR
 	if !ok {
 		return pkg.ErrLackSession
 	}
-	if !s.GetReady() {
-		return pkg.ErrSessionHasNotInitialized
-	}
 
 	respChan, ok := s.GetReqID2respChan().Get(fmt.Sprint(response.ID))
 	if !ok {
