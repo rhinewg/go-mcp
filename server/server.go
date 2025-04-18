@@ -85,6 +85,8 @@ func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
 		opt(server)
 	}
 
+	server.sessionManager.SetLogger(server.logger)
+
 	t.SetSessionManager(server.sessionManager)
 
 	return server, nil
@@ -108,7 +110,7 @@ type toolEntry struct {
 	handler ToolHandlerFunc
 }
 
-type ToolHandlerFunc func(*protocol.CallToolRequest) (*protocol.CallToolResult, error)
+type ToolHandlerFunc func(context.Context, *protocol.CallToolRequest) (*protocol.CallToolResult, error)
 
 func (server *Server) RegisterTool(tool *protocol.Tool, toolHandler ToolHandlerFunc) {
 	server.tools.Store(tool.Name, &toolEntry{tool: tool, handler: toolHandler})
@@ -135,7 +137,7 @@ type promptEntry struct {
 	handler PromptHandlerFunc
 }
 
-type PromptHandlerFunc func(*protocol.GetPromptRequest) (*protocol.GetPromptResult, error)
+type PromptHandlerFunc func(context.Context, *protocol.GetPromptRequest) (*protocol.GetPromptResult, error)
 
 func (server *Server) RegisterPrompt(prompt *protocol.Prompt, promptHandler PromptHandlerFunc) {
 	server.prompts.Store(prompt.Name, &promptEntry{prompt: prompt, handler: promptHandler})
@@ -162,7 +164,7 @@ type resourceEntry struct {
 	handler  ResourceHandlerFunc
 }
 
-type ResourceHandlerFunc func(*protocol.ReadResourceRequest) (*protocol.ReadResourceResult, error)
+type ResourceHandlerFunc func(context.Context, *protocol.ReadResourceRequest) (*protocol.ReadResourceResult, error)
 
 func (server *Server) RegisterResource(resource *protocol.Resource, resourceHandler ResourceHandlerFunc) {
 	server.resources.Store(resource.URI, &resourceEntry{resource: resource, handler: resourceHandler})

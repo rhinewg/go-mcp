@@ -87,9 +87,22 @@ func (t *mockServerTransport) receive(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			if err := t.receiver.Receive(ctx, mockSessionID, s.Bytes()); err != nil {
+			outputMsgCh, err := t.receiver.Receive(ctx, mockSessionID, s.Bytes())
+			if err != nil {
 				t.logger.Errorf("receiver failed: %v", err)
-				continue
+				return
+			}
+
+			if outputMsgCh != nil {
+				go func() {
+					defer pkg.Recover()
+
+					if msg := <-outputMsgCh; len(msg) != 0 {
+						if err := t.Send(context.Background(), mockSessionID, msg); err != nil {
+							t.logger.Errorf("Failed to send message: %v", err)
+						}
+					}
+				}()
 			}
 		}
 	}

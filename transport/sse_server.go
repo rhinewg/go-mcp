@@ -183,11 +183,10 @@ func (t *sseServerTransport) Send(ctx context.Context, sessionID string, msg Mes
 
 	select {
 	case <-t.ctx.Done():
-		return ctx.Err()
+		return t.ctx.Err()
 	default:
+		return t.sessionManager.SendMessage(ctx, sessionID, msg)
 	}
-
-	return t.sessionManager.SendMessage(ctx, sessionID, msg)
 }
 
 func (t *sseServerTransport) SetReceiver(receiver serverReceiver) {
@@ -200,10 +199,10 @@ func (t *sseServerTransport) SetSessionManager(manager sessionManager) {
 
 // handleSSE handles incoming SSE connections from clients and sends messages to them.
 func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
-	defer pkg.Recover()
+	defer pkg.RecoverWithFunc(func(_ any) {
+		t.writeError(w, http.StatusInternalServerError, "Internal server error")
+	})
 
-	//nolint:govet // Ignore error since we're just logging
-	requestCtx := r.Context()
 	// Set headers for SSE
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -231,10 +230,10 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 	flusher.Flush()
 
 	for {
-		msg, err := t.sessionManager.GetMessageForSend(requestCtx, sessionID)
+		msg, err := t.sessionManager.GetMessageForSend(r.Context(), sessionID)
 		if err != nil {
 			if !errors.Is(err, pkg.ErrSendEOF) {
-				t.logger.Debugf("sse connect request err: %+v, sessionID=%s", err.Error(), sessionID)
+				t.logger.Errorf("sse connect request err: %+v, sessionID=%s", err.Error(), sessionID)
 			}
 			return
 		}
@@ -267,21 +266,33 @@ func (t *sseServerTransport) handleMessage(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ctx := r.Context()
 	// Parse message as raw JSON
-	bs, err := io.ReadAll(r.Body)
+	inputMsg, err := io.ReadAll(r.Body)
 	if err != nil {
 		t.writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request: %v", err))
 		return
 	}
-	if err = t.receiver.Receive(ctx, sessionID, bs); err != nil {
+
+	outputMsgCh, err := t.receiver.Receive(r.Context(), sessionID, inputMsg)
+	if err != nil {
 		t.writeError(w, http.StatusBadRequest, fmt.Sprintf("Failed to receive: %v", err))
 		return
 	}
-	// Process message through MCPServer
+
+	if outputMsgCh != nil {
+		go func() {
+			defer pkg.Recover()
+
+			if msg := <-outputMsgCh; len(msg) != 0 {
+				if err := t.Send(context.Background(), sessionID, msg); err != nil {
+					t.logger.Errorf("Failed to send message: %v", err)
+				}
+			}
+		}()
+	}
 
 	// For notifications, just send 202 Accepted with no body
-	t.logger.Debugf("Received message: %s", string(bs))
+	t.logger.Debugf("Received message: %s", string(inputMsg))
 	// ref: https://github.com/encode/httpx/blob/master/httpx/_status_codes.py#L8
 	// in official httpx, 2xx is success
 	w.WriteHeader(http.StatusAccepted)
@@ -289,7 +300,8 @@ func (t *sseServerTransport) handleMessage(w http.ResponseWriter, r *http.Reques
 
 // writeError writes a JSON-RPC error response with the given error details.
 func (t *sseServerTransport) writeError(w http.ResponseWriter, code int, message string) {
-	t.logger.Errorf("sseServerTransport writeError: code: %d, message: %s", code, message)
+	t.logger.Errorf("sseServerTransport Error: code: %d, message: %s", code, message)
+
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(code)
 	if _, err := w.Write([]byte(message)); err != nil {

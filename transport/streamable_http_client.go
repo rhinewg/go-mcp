@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
@@ -16,7 +17,7 @@ import (
 
 const sessionIDHeader = "Mcp-Session-Id"
 
-const eventIDHeader = "Last-Event-ID"
+// const eventIDHeader = "Last-Event-ID"
 
 type StreamableHTTPClientTransportOption func(*streamableHTTPClientTransport)
 
@@ -42,15 +43,16 @@ type streamableHTTPClientTransport struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	serverURL   *url.URL
-	receiver    clientReceiver
-	sessionID   *pkg.AtomicString
-	lastEventID *pkg.AtomicString
+	serverURL *url.URL
+	receiver  clientReceiver
+	sessionID *pkg.AtomicString
 
 	// options
 	logger         pkg.Logger
 	receiveTimeout time.Duration
 	client         *http.Client
+
+	sseInFlyConnect sync.WaitGroup
 }
 
 func NewStreamableHTTPClientTransport(serverURL string, opts ...StreamableHTTPClientTransportOption) (ClientTransport, error) {
@@ -66,7 +68,6 @@ func NewStreamableHTTPClientTransport(serverURL string, opts ...StreamableHTTPCl
 		cancel:         cancel,
 		serverURL:      parsedURL,
 		sessionID:      pkg.NewAtomicString(),
-		lastEventID:    pkg.NewAtomicString(),
 		logger:         pkg.DefaultLogger,
 		receiveTimeout: time.Second * 30,
 		client:         http.DefaultClient,
@@ -84,13 +85,16 @@ func (t *streamableHTTPClientTransport) Start() error {
 	go func() {
 		defer pkg.Recover()
 
+		t.sseInFlyConnect.Add(1)
+		defer t.sseInFlyConnect.Done()
+
 		t.startSSEStream()
 	}()
 	return nil
 }
 
 func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, t.serverURL.String(), bytes.NewReader(msg))
+	req, err := http.NewRequestWithContext(t.ctx, http.MethodPost, t.serverURL.String(), bytes.NewReader(msg))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -108,29 +112,35 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		if req.Header.Get(sessionIDHeader) != "" && resp.StatusCode == http.StatusNotFound {
+			return pkg.ErrSessionClosed
+		}
+		return fmt.Errorf("unexpected status code: %d, status: %s", resp.StatusCode, resp.Status)
+	}
+
 	// Handle session ID if provided in response
-	respSessionID := resp.Header.Get(sessionIDHeader)
-	localSessionID := t.sessionID.Load()
-	if respSessionID != "" {
-		if localSessionID != "" && respSessionID != localSessionID {
-			return fmt.Errorf("failed to send message: session ID does not match")
-		}
-		if localSessionID == "" {
-			t.sessionID.Store(respSessionID)
-		}
+	if respSessionID := resp.Header.Get(sessionIDHeader); respSessionID != "" {
+		// Theoretically, we need to do some session verification here, but considering the session resumability and redelivery mechanism, the session will be overwritten, so we will not do the verification for now.
+		t.sessionID.Store(respSessionID)
 	}
 
 	// Handle different response types
 	switch resp.Header.Get("Content-Type") {
 	case "text/event-stream":
-		go t.handleSSEStream(resp.Body)
+		go func() {
+			defer pkg.Recover()
+
+			t.sseInFlyConnect.Add(1)
+			defer t.sseInFlyConnect.Done()
+
+			t.handleSSEStream(resp.Body)
+		}()
 		return nil
 	case "application/json":
-		// Handle immediate JSON response
-		if resp.StatusCode == http.StatusAccepted {
-			return nil // For notifications and responses
+		if resp.StatusCode == http.StatusAccepted { // Handle immediate JSON response
+			return nil
 		}
-		// Process JSON response
 		if err = t.receiver.Receive(ctx, msg); err != nil {
 			return fmt.Errorf("failed to process response: %w", err)
 		}
@@ -145,33 +155,41 @@ func (t *streamableHTTPClientTransport) startSSEStream() {
 		select {
 		case <-t.ctx.Done():
 			return
-		default:
+		case <-time.After(time.Second):
+			sessionID := t.sessionID.Load()
+			if sessionID == "" {
+				continue // Try again after 1 second, waiting for the POST request to initialize the SessionID to complete
+			}
+
 			req, err := http.NewRequestWithContext(t.ctx, http.MethodGet, t.serverURL.String(), nil)
 			if err != nil {
 				t.logger.Errorf("failed to create SSE request: %v", err)
-				time.Sleep(time.Second)
-				continue
+				return
 			}
 
 			req.Header.Set("Accept", "text/event-stream")
-			if lastEventID := t.lastEventID.Load(); lastEventID != "" {
-				req.Header.Set(eventIDHeader, lastEventID)
-			}
-			if sessionID := t.sessionID.Load(); sessionID != "" {
-				req.Header.Set(sessionIDHeader, sessionID)
-			}
+			req.Header.Set(sessionIDHeader, sessionID)
 
 			resp, err := t.client.Do(req)
 			if err != nil {
 				t.logger.Errorf("failed to connect to SSE stream: %v", err)
-				time.Sleep(time.Second)
 				continue
 			}
 
-			if resp.StatusCode == http.StatusMethodNotAllowed {
+			if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 				resp.Body.Close()
-				t.logger.Debugf("server does not support SSE streaming")
-				return
+
+				switch resp.StatusCode {
+				case http.StatusMethodNotAllowed:
+					t.logger.Infof("server does not support SSE streaming")
+					return
+				case http.StatusNotFound:
+					t.logger.Infof("%+v", pkg.ErrSessionClosed)
+					continue // Try again after 1 second, waiting for the POST request again to initialize the SessionID to complete
+				default:
+					t.logger.Infof("unexpected status code: %d, status: %s", resp.StatusCode, resp.Status)
+					return
+				}
 			}
 
 			t.handleSSEStream(resp.Body)
@@ -182,19 +200,8 @@ func (t *streamableHTTPClientTransport) startSSEStream() {
 func (t *streamableHTTPClientTransport) handleSSEStream(reader io.ReadCloser) {
 	defer reader.Close()
 
-	go func() {
-		defer pkg.Recover()
-
-		<-t.ctx.Done()
-
-		if err := reader.Close(); err != nil {
-			t.logger.Errorf("failed to close SSE stream body: %+v", err)
-			return
-		}
-	}()
-
 	br := bufio.NewReader(reader)
-	var _, data, id string
+	var data string
 
 	for {
 		line, err := br.ReadString('\n')
@@ -221,19 +228,13 @@ func (t *streamableHTTPClientTransport) handleSSEStream(reader io.ReadCloser) {
 			// Empty line means end of event
 			if data != "" {
 				t.processSSEEvent(data)
-				_, data, id = "", "", ""
+				_, data = "", ""
 			}
 			continue
 		}
 
-		switch {
-		case strings.HasPrefix(line, "event:"):
-			_ = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
-		case strings.HasPrefix(line, "data:"):
+		if strings.HasPrefix(line, "data:") {
 			data = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-		case strings.HasPrefix(line, "id:"):
-			id = strings.TrimSpace(strings.TrimPrefix(line, "id:"))
-			t.lastEventID.Store(id)
 		}
 	}
 }
@@ -253,6 +254,8 @@ func (t *streamableHTTPClientTransport) SetReceiver(receiver clientReceiver) {
 
 func (t *streamableHTTPClientTransport) Close() error {
 	t.cancel()
+
+	t.sseInFlyConnect.Wait()
 
 	if sessionID := t.sessionID.Load(); sessionID != "" {
 		req, err := http.NewRequest(http.MethodDelete, t.serverURL.String(), nil)

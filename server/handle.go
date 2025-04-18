@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -62,7 +63,7 @@ func (server *Server) handleRequestWithListPrompts(rawParams json.RawMessage) (*
 	}, nil
 }
 
-func (server *Server) handleRequestWithGetPrompt(rawParams json.RawMessage) (*protocol.GetPromptResult, error) {
+func (server *Server) handleRequestWithGetPrompt(ctx context.Context, rawParams json.RawMessage) (*protocol.GetPromptResult, error) {
 	if server.capabilities.Prompts == nil {
 		return nil, pkg.ErrServerNotSupport
 	}
@@ -76,7 +77,7 @@ func (server *Server) handleRequestWithGetPrompt(rawParams json.RawMessage) (*pr
 	if !ok {
 		return nil, fmt.Errorf("missing prompt, promptName=%s", request.Name)
 	}
-	return entry.handler(request)
+	return entry.handler(ctx, request)
 }
 
 func (server *Server) handleRequestWithListResources(rawParams json.RawMessage) (*protocol.ListResourcesResult, error) {
@@ -125,7 +126,7 @@ func (server *Server) handleRequestWithListResourceTemplates(rawParams json.RawM
 	}, nil
 }
 
-func (server *Server) handleRequestWithReadResource(rawParams json.RawMessage) (*protocol.ReadResourceResult, error) {
+func (server *Server) handleRequestWithReadResource(ctx context.Context, rawParams json.RawMessage) (*protocol.ReadResourceResult, error) {
 	if server.capabilities.Resources == nil {
 		return nil, pkg.ErrServerNotSupport
 	}
@@ -156,7 +157,7 @@ func (server *Server) handleRequestWithReadResource(rawParams json.RawMessage) (
 	if handler == nil {
 		return nil, fmt.Errorf("missing resource, resourceName=%s", request.URI)
 	}
-	return handler(request)
+	return handler(ctx, request)
 }
 
 func matchesTemplate(uri string, template *uritemplate.Template) bool {
@@ -220,7 +221,7 @@ func (server *Server) handleRequestWithListTools(rawParams json.RawMessage) (*pr
 	return &protocol.ListToolsResult{Tools: tools}, nil
 }
 
-func (server *Server) handleRequestWithCallTool(rawParams json.RawMessage) (*protocol.CallToolResult, error) {
+func (server *Server) handleRequestWithCallTool(ctx context.Context, rawParams json.RawMessage) (*protocol.CallToolResult, error) {
 	if server.capabilities.Tools == nil {
 		return nil, pkg.ErrServerNotSupport
 	}
@@ -235,7 +236,7 @@ func (server *Server) handleRequestWithCallTool(rawParams json.RawMessage) (*pro
 		return nil, fmt.Errorf("missing tool, toolName=%s", request.Name)
 	}
 
-	return entry.handler(request)
+	return entry.handler(ctx, request)
 }
 
 func (server *Server) handleNotifyWithInitialized(sessionID string, rawParams json.RawMessage) error {

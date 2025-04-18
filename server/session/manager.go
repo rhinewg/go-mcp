@@ -8,9 +8,12 @@ import (
 )
 
 type Manager struct {
-	sessions pkg.SyncMap[*State]
+	activeSessions pkg.SyncMap[*State]
+	closedSessions pkg.SyncMap[*State]
 
 	stopHeartbeat chan struct{}
+
+	logger pkg.Logger
 
 	detection   func(ctx context.Context, sessionID string) error
 	maxIdleTime time.Duration
@@ -20,6 +23,7 @@ func NewManager(detection func(ctx context.Context, sessionID string) error) *Ma
 	return &Manager{
 		detection:     detection,
 		stopHeartbeat: make(chan struct{}),
+		logger:        pkg.DefaultLogger,
 	}
 }
 
@@ -27,18 +31,27 @@ func (m *Manager) SetMaxIdleTime(d time.Duration) {
 	m.maxIdleTime = d
 }
 
-func (m *Manager) CreateSession(sessionID string) {
-	state := NewState()
-	m.sessions.Store(sessionID, state)
+func (m *Manager) SetLogger(logger pkg.Logger) {
+	m.logger = logger
 }
 
-func (m *Manager) IsExistSession(sessionID string) bool {
-	_, has := m.sessions.Load(sessionID)
+func (m *Manager) CreateSession(sessionID string) {
+	state := NewState()
+	m.activeSessions.Store(sessionID, state)
+}
+
+func (m *Manager) IsActiveSession(sessionID string) bool {
+	_, has := m.activeSessions.Load(sessionID)
+	return has
+}
+
+func (m *Manager) IsClosedSession(sessionID string) bool {
+	_, has := m.closedSessions.Load(sessionID)
 	return has
 }
 
 func (m *Manager) GetSession(sessionID string) (*State, bool) {
-	state, has := m.sessions.Load(sessionID)
+	state, has := m.activeSessions.Load(sessionID)
 	if !has {
 		return nil, false
 	}
@@ -62,7 +75,7 @@ func (m *Manager) GetMessageForSend(ctx context.Context, sessionID string) ([]by
 }
 
 func (m *Manager) UpdateSessionLastActiveAt(sessionID string) {
-	state, ok := m.sessions.Load(sessionID)
+	state, ok := m.activeSessions.Load(sessionID)
 	if !ok {
 		return
 	}
@@ -70,21 +83,18 @@ func (m *Manager) UpdateSessionLastActiveAt(sessionID string) {
 }
 
 func (m *Manager) CloseSession(sessionID string) {
-	state, ok := m.sessions.LoadAndDelete(sessionID)
+	state, ok := m.activeSessions.LoadAndDelete(sessionID)
 	if !ok {
 		return
 	}
 	state.Close()
+	m.closedSessions.Store(sessionID, state)
 }
 
 func (m *Manager) CloseAllSessions() {
-	m.sessions.Range(func(sessionID string, _ *State) bool {
+	m.activeSessions.Range(func(sessionID string, _ *State) bool {
 		// Here we load the session again to prevent concurrency conflicts with CloseSession, which may cause repeated close chan
-		state, ok := m.sessions.LoadAndDelete(sessionID)
-		if !ok {
-			return true
-		}
-		state.Close()
+		m.CloseSession(sessionID)
 		return true
 	})
 }
@@ -99,17 +109,20 @@ func (m *Manager) StartHeartbeatAndCleanInvalidSessions() {
 			return
 		case <-ticker.C:
 			now := time.Now()
-			m.sessions.Range(func(sessionID string, state *State) bool {
+			m.activeSessions.Range(func(sessionID string, state *State) bool {
 				if m.maxIdleTime != 0 && now.Sub(state.lastActiveAt) > m.maxIdleTime {
+					m.logger.Infof("session expire, session id: %v", sessionID)
 					m.CloseSession(sessionID)
 					return true
 				}
 
+				var err error
 				for i := 0; i < 3; i++ {
-					if err := m.detection(context.Background(), sessionID); err == nil {
+					if err = m.detection(context.Background(), sessionID); err == nil {
 						return true
 					}
 				}
+				m.logger.Infof("session detection fail, session id: %v, fail reason: %+v", sessionID, err)
 				m.CloseSession(sessionID)
 				return true
 			})
@@ -122,12 +135,12 @@ func (m *Manager) StopHeartbeat() {
 }
 
 func (m *Manager) RangeSessions(f func(sessionID string, state *State) bool) {
-	m.sessions.Range(f)
+	m.activeSessions.Range(f)
 }
 
 func (m *Manager) IsEmpty() bool {
 	isEmpty := true
-	m.sessions.Range(func(string, *State) bool {
+	m.activeSessions.Range(func(string, *State) bool {
 		isEmpty = false
 		return false
 	})

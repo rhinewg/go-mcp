@@ -98,7 +98,7 @@ func (server *Server) SendNotification4ResourcesUpdated(ctx context.Context, not
 func (server *Server) callClient(ctx context.Context, sessionID string, method protocol.Method, params protocol.ServerRequest) (json.RawMessage, error) {
 	session, ok := server.sessionManager.GetSession(sessionID)
 	if !ok {
-		return nil, pkg.ErrLackSession
+		return nil, fmt.Errorf("callClient: %w", pkg.ErrLackSession)
 	}
 
 	requestID := strconv.FormatInt(session.IncRequestID(), 10)
@@ -107,7 +107,7 @@ func (server *Server) callClient(ctx context.Context, sessionID string, method p
 	defer session.GetReqID2respChan().Remove(requestID)
 
 	if err := server.sendMsgWithRequest(ctx, sessionID, requestID, method, params); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("callClient: %w", err)
 	}
 
 	select {

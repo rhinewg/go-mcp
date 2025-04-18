@@ -108,10 +108,26 @@ func (t *stdioServerTransport) receive(ctx context.Context) {
 				t.logger.Debugf("skipping empty message")
 				continue
 			}
-			if err := t.receiver.Receive(ctx, stdioSessionID, s.Bytes()); err != nil {
+
+			outputMsgCh, err := t.receiver.Receive(ctx, stdioSessionID, s.Bytes())
+			if err != nil {
 				t.logger.Errorf("receiver failed: %v", err)
+				return
+			}
+
+			if outputMsgCh == nil {
 				continue
 			}
+
+			go func() {
+				defer pkg.Recover()
+
+				if msg := <-outputMsgCh; len(msg) != 0 {
+					if err := t.Send(context.Background(), stdioSessionID, msg); err != nil {
+						t.logger.Errorf("Failed to send message: %v", err)
+					}
+				}
+			}()
 		}
 	}
 
