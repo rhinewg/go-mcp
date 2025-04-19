@@ -135,13 +135,13 @@ func (server *Server) receiveRequest(sessionID string, request *protocol.JSONRPC
 	if err != nil {
 		switch {
 		case errors.Is(err, pkg.ErrMethodNotSupport):
-			return server.sendMsgWithError(ctx, sessionID, request.ID, protocol.METHOD_NOT_FOUND, err.Error())
+			return server.sendMsgWithError(ctx, sessionID, request.ID, protocol.MethodNotFound, err.Error())
 		case errors.Is(err, pkg.ErrRequestInvalid):
-			return server.sendMsgWithError(ctx, sessionID, request.ID, protocol.INVALID_REQUEST, err.Error())
+			return server.sendMsgWithError(ctx, sessionID, request.ID, protocol.InvalidRequest, err.Error())
 		case errors.Is(err, pkg.ErrJSONUnmarshal):
-			return server.sendMsgWithError(ctx, sessionID, request.ID, protocol.PARSE_ERROR, err.Error())
+			return server.sendMsgWithError(ctx, sessionID, request.ID, protocol.ParseError, err.Error())
 		default:
-			return server.sendMsgWithError(ctx, sessionID, request.ID, protocol.INTERNAL_ERROR, err.Error())
+			return server.sendMsgWithError(ctx, sessionID, request.ID, protocol.InternalError, err.Error())
 		}
 	}
 	return server.sendMsgWithResponse(ctx, sessionID, request.ID, result)

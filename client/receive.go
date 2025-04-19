@@ -88,13 +88,13 @@ func (client *Client) receiveRequest(ctx context.Context, request *protocol.JSON
 	if err != nil {
 		switch {
 		case errors.Is(err, pkg.ErrMethodNotSupport):
-			return client.sendMsgWithError(ctx, request.ID, protocol.METHOD_NOT_FOUND, err.Error())
+			return client.sendMsgWithError(ctx, request.ID, protocol.MethodNotFound, err.Error())
 		case errors.Is(err, pkg.ErrRequestInvalid):
-			return client.sendMsgWithError(ctx, request.ID, protocol.INVALID_REQUEST, err.Error())
+			return client.sendMsgWithError(ctx, request.ID, protocol.InvalidRequest, err.Error())
 		case errors.Is(err, pkg.ErrJSONUnmarshal):
-			return client.sendMsgWithError(ctx, request.ID, protocol.PARSE_ERROR, err.Error())
+			return client.sendMsgWithError(ctx, request.ID, protocol.ParseError, err.Error())
 		default:
-			return client.sendMsgWithError(ctx, request.ID, protocol.INTERNAL_ERROR, err.Error())
+			return client.sendMsgWithError(ctx, request.ID, protocol.InternalError, err.Error())
 		}
 	}
 	return client.sendMsgWithResponse(ctx, request.ID, result)
