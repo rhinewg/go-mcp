@@ -75,15 +75,19 @@ func (m *mockSessionManager) CloseAllSessions() {
 }
 
 func testTransport(t *testing.T, client ClientTransport, server ServerTransport) {
-	msgWithServer := "hello"
+	msgWithServer := "hello server"
 	expectedMsgWithServerCh := make(chan string, 1)
-	server.SetReceiver(ServerReceiverF(func(_ context.Context, _ string, msg []byte) error {
+	server.SetReceiver(ServerReceiverF(func(_ context.Context, _ string, msg []byte) (<-chan []byte, error) {
 		expectedMsgWithServerCh <- string(msg)
-		return nil
+		msgCh := make(chan []byte, 1)
+		go func() {
+			msgCh <- msg
+		}()
+		return msgCh, nil
 	}))
 	server.SetSessionManager(newMockSessionManager())
 
-	msgWithClient := "hello"
+	msgWithClient := "hello client"
 	expectedMsgWithClientCh := make(chan string, 1)
 	client.SetReceiver(ClientReceiverF(func(_ context.Context, msg []byte) error {
 		expectedMsgWithClientCh <- string(msg)
@@ -135,6 +139,10 @@ func testTransport(t *testing.T, client ClientTransport, server ServerTransport)
 	expectedMsg := <-expectedMsgWithServerCh
 	if !reflect.DeepEqual(expectedMsg, msgWithServer) {
 		t.Fatalf("client.Send() got %v, want %v", expectedMsg, msgWithServer)
+	}
+	expectedMsg = <-expectedMsgWithClientCh
+	if !reflect.DeepEqual(expectedMsg, msgWithServer) {
+		t.Fatalf("server.Send() failed: got %v, want %v", expectedMsg, msgWithServer)
 	}
 
 	sessionID := ""

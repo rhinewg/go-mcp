@@ -106,7 +106,7 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 		req.Header.Set(sessionIDHeader, sessionID)
 	}
 
-	resp, err := t.client.Do(req)
+	resp, err := t.client.Do(req) //nolint:bodyclose
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
@@ -121,7 +121,6 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 
 	// Handle session ID if provided in response
 	if respSessionID := resp.Header.Get(sessionIDHeader); respSessionID != "" {
-		// Theoretically, we need to do some session verification here, but considering the session resumability and redelivery mechanism, the session will be overwritten, so we will not do the verification for now.
 		t.sessionID.Store(respSessionID)
 	}
 

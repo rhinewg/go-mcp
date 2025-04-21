@@ -1,6 +1,6 @@
 package protocol
 
-const Version = "2024-11-05"
+const Version = "2025-03-26"
 
 // Method represents the JSON-RPC method name
 type Method string

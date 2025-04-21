@@ -150,6 +150,7 @@ func NewSSEServerTransport(addr string, opts ...SSEServerTransportOption) (Serve
 func NewSSEServerTransportAndHandler(messageEndpointURL string,
 	opts ...SSEServerTransportAndHandlerOption,
 ) (ServerTransport, *SSEHandler, error) { //nolint:whitespace
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	t := &sseServerTransport{

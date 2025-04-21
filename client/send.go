@@ -26,10 +26,9 @@ func (client *Client) sendMsgWithRequest(ctx context.Context, requestID protocol
 		if !errors.Is(err, pkg.ErrSessionClosed) {
 			return fmt.Errorf("sendRequest: transport send: %w", err)
 		}
-		if err = client.againInitialization(ctx, err); err != nil {
+		if err = client.againInitialization(ctx); err != nil {
 			return err
 		}
-
 	}
 	return nil
 }
@@ -84,7 +83,7 @@ func (client *Client) sendMsgWithError(ctx context.Context, requestID protocol.R
 	return nil
 }
 
-func (client *Client) againInitialization(ctx context.Context, err error) error {
+func (client *Client) againInitialization(ctx context.Context) error {
 	client.ready.Store(false)
 
 	client.initializationMu.Lock()
@@ -94,7 +93,7 @@ func (client *Client) againInitialization(ctx context.Context, err error) error 
 		return nil
 	}
 
-	if _, err = client.initialization(ctx, protocol.NewInitializeRequest(*client.clientInfo, *client.clientCapabilities)); err != nil {
+	if _, err := client.initialization(ctx, protocol.NewInitializeRequest(*client.clientInfo, *client.clientCapabilities)); err != nil {
 		return err
 	}
 	client.ready.Store(true)

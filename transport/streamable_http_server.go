@@ -78,7 +78,8 @@ func (h *StreamableHTTPHandler) HandleMCP() http.Handler {
 // http.ListenAndServe(":8080", nil)
 func NewStreamableHTTPServerTransportAndHandler(
 	opts ...StreamableHTTPServerTransportAndHandlerOption,
-) (ServerTransport, *StreamableHTTPHandler, error) {
+) (ServerTransport, *StreamableHTTPHandler, error) { //nolint:whitespace
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	t := &streamableHTTPServerTransport{
@@ -184,7 +185,7 @@ func (t *streamableHTTPServerTransport) handlePost(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// Disconnection SHOULD NOT be interpreted as the client cancelling its request.
+	// Disconnection SHOULD NOT be interpreted as the client canceling its request.
 	// To cancel, the client SHOULD explicitly send an MCP CancelledNotification.
 	ctx := pkg.NewCancelShieldContext(r.Context())
 
