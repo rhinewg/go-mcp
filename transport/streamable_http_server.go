@@ -27,6 +27,14 @@ func WithStreamableHTTPServerTransportOptionEndpoint(endpoint string) Streamable
 	}
 }
 
+type StreamableHTTPServerTransportAndHandlerOption func(*streamableHTTPServerTransport)
+
+func WithStreamableHTTPServerTransportAndHandlerOptionLogger(logger pkg.Logger) StreamableHTTPServerTransportAndHandlerOption {
+	return func(t *streamableHTTPServerTransport) {
+		t.logger = logger
+	}
+}
+
 type streamableHTTPServerTransport struct {
 	// ctx is the context that controls the lifecycle of the server
 	ctx    context.Context
@@ -43,6 +51,41 @@ type streamableHTTPServerTransport struct {
 	// options
 	logger      pkg.Logger
 	mcpEndpoint string // The single MCP endpoint path
+}
+
+type StreamableHTTPHandler struct {
+	transport *streamableHTTPServerTransport
+}
+
+// HandleMCP handles incoming MCP requests
+func (h *StreamableHTTPHandler) HandleMCP() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.transport.handleMCPEndpoint(w, r)
+	})
+}
+
+// NewStreamableHTTPServerTransportAndHandler returns transport without starting the HTTP server,
+// and returns a Handler for users to start their own HTTP server externally
+// eg:
+// transport, handler, _ := NewStreamableHTTPServerTransportAndHandler()
+// http.Handle("/mcp", handler.HandleMCP())
+// http.ListenAndServe(":8080", nil)
+func NewStreamableHTTPServerTransportAndHandler(
+	opts ...StreamableHTTPServerTransportAndHandlerOption,
+) (ServerTransport, *StreamableHTTPHandler, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	t := &streamableHTTPServerTransport{
+		ctx:    ctx,
+		cancel: cancel,
+		logger: pkg.DefaultLogger,
+	}
+
+	for _, opt := range opts {
+		opt(t)
+	}
+
+	return t, &StreamableHTTPHandler{transport: t}, nil
 }
 
 func NewStreamableHTTPServerTransport(addr string, opts ...StreamableHTTPServerTransportOption) (ServerTransport, error) {
@@ -72,6 +115,11 @@ func NewStreamableHTTPServerTransport(addr string, opts ...StreamableHTTPServerT
 }
 
 func (t *streamableHTTPServerTransport) Run() error {
+	if t.httpSvr == nil {
+		<-t.ctx.Done()
+		return nil
+	}
+
 	if err := t.httpSvr.ListenAndServe(); err != nil {
 		return fmt.Errorf("failed to start HTTP server: %w", err)
 	}
@@ -241,9 +289,17 @@ func (t *streamableHTTPServerTransport) writeError(w http.ResponseWriter, code i
 func (t *streamableHTTPServerTransport) Shutdown(userCtx context.Context, serverCtx context.Context) error {
 	shutdownFunc := func() {
 		<-serverCtx.Done()
+
 		t.cancel()
+
 		t.inFlySend.Wait()
+
 		t.sessionManager.CloseAllSessions()
+	}
+
+	if t.httpSvr == nil {
+		shutdownFunc()
+		return nil
 	}
 
 	t.httpSvr.RegisterOnShutdown(shutdownFunc)

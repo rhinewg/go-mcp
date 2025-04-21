@@ -93,7 +93,7 @@ func main() {
 	}
 }
 
-func currentTime(request *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+func currentTime(ctx context.Context, request *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
 	req := new(currentTimeReq)
 	if err := protocol.VerifyAndUnmarshal(request.RawArguments, &req); err != nil {
 		return nil, err

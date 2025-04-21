@@ -273,7 +273,8 @@ func (t *sseServerTransport) handleMessage(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	outputMsgCh, err := t.receiver.Receive(r.Context(), sessionID, inputMsg)
+	ctx := pkg.CancelShieldContext{Context: r.Context()}
+	outputMsgCh, err := t.receiver.Receive(ctx, sessionID, inputMsg)
 	if err != nil {
 		t.writeError(w, http.StatusBadRequest, fmt.Sprintf("Failed to receive: %v", err))
 		return
