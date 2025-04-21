@@ -58,20 +58,20 @@ func (m *Manager) GetSession(sessionID string) (*State, bool) {
 	return state, true
 }
 
-func (m *Manager) SendMessage(ctx context.Context, sessionID string, message []byte) error {
+func (m *Manager) EnqueueMessage(ctx context.Context, sessionID string, message []byte) error {
 	state, has := m.GetSession(sessionID)
 	if !has {
 		return pkg.ErrLackSession
 	}
-	return state.sendMessage(ctx, message)
+	return state.enqueueMessage(ctx, message)
 }
 
-func (m *Manager) GetMessageForSend(ctx context.Context, sessionID string) ([]byte, error) {
+func (m *Manager) DequeueMessage(ctx context.Context, sessionID string) ([]byte, error) {
 	state, has := m.GetSession(sessionID)
 	if !has {
 		return nil, pkg.ErrLackSession
 	}
-	return state.getMessageForSend(ctx)
+	return state.dequeueMessage(ctx)
 }
 
 func (m *Manager) UpdateSessionLastActiveAt(sessionID string) {

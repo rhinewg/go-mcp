@@ -26,7 +26,7 @@ func (m *mockSessionManager) IsExistSession(sessionID string) bool {
 	return has
 }
 
-func (m *mockSessionManager) SendMessage(ctx context.Context, sessionID string, message []byte) error {
+func (m *mockSessionManager) EnqueueMessage(ctx context.Context, sessionID string, message []byte) error {
 	ch, has := m.Load(sessionID)
 	if !has {
 		return pkg.ErrLackSession
@@ -40,7 +40,7 @@ func (m *mockSessionManager) SendMessage(ctx context.Context, sessionID string, 
 	}
 }
 
-func (m *mockSessionManager) GetMessageForSend(ctx context.Context, sessionID string) ([]byte, error) {
+func (m *mockSessionManager) DequeueMessage(ctx context.Context, sessionID string) ([]byte, error) {
 	ch, has := m.Load(sessionID)
 	if !has {
 		return nil, pkg.ErrLackSession

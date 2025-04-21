@@ -134,7 +134,7 @@ func (t *streamableHTTPServerTransport) Send(ctx context.Context, sessionID stri
 	case <-t.ctx.Done():
 		return t.ctx.Err()
 	default:
-		return t.sessionManager.SendMessage(ctx, sessionID, msg)
+		return t.sessionManager.EnqueueMessage(ctx, sessionID, msg)
 	}
 }
 
@@ -247,7 +247,7 @@ func (t *streamableHTTPServerTransport) handleGet(w http.ResponseWriter, r *http
 	}
 
 	for {
-		msg, err := t.sessionManager.GetMessageForSend(r.Context(), sessionID)
+		msg, err := t.sessionManager.DequeueMessage(r.Context(), sessionID)
 		if err != nil {
 			if !errors.Is(err, pkg.ErrSendEOF) {
 				t.logger.Errorf("SSE stream getMessageForSend: %v, sessionID=%s", err, sessionID)

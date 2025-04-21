@@ -92,7 +92,7 @@ func (s *State) updateLastActiveAt() {
 	s.lastActiveAt = time.Now()
 }
 
-func (s *State) sendMessage(ctx context.Context, message []byte) error {
+func (s *State) enqueueMessage(ctx context.Context, message []byte) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -108,7 +108,7 @@ func (s *State) sendMessage(ctx context.Context, message []byte) error {
 	}
 }
 
-func (s *State) getMessageForSend(ctx context.Context) ([]byte, error) {
+func (s *State) dequeueMessage(ctx context.Context) ([]byte, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()

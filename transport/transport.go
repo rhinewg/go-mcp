@@ -78,8 +78,8 @@ func (f ServerReceiverF) Receive(ctx context.Context, sessionID string, msg []by
 
 type sessionManager interface {
 	CreateSession(sessionID string)
-	SendMessage(ctx context.Context, sessionID string, message []byte) error
-	GetMessageForSend(ctx context.Context, sessionID string) ([]byte, error)
+	EnqueueMessage(ctx context.Context, sessionID string, message []byte) error
+	DequeueMessage(ctx context.Context, sessionID string) ([]byte, error)
 	CloseSession(sessionID string)
 	CloseAllSessions()
 }
