@@ -13,6 +13,12 @@ import (
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
 
+type SessionIDForReturnKey struct{}
+
+type SessionIDForReturn struct {
+	SessionID string
+}
+
 type StreamableHTTPServerTransportOption func(*streamableHTTPServerTransport)
 
 func WithStreamableHTTPServerTransportOptionLogger(logger pkg.Logger) StreamableHTTPServerTransportOption {
@@ -180,7 +186,11 @@ func (t *streamableHTTPServerTransport) handlePost(w http.ResponseWriter, r *htt
 
 	// Disconnection SHOULD NOT be interpreted as the client cancelling its request.
 	// To cancel, the client SHOULD explicitly send an MCP CancelledNotification.
-	ctx := pkg.CancelShieldContext{Context: r.Context()}
+	ctx := pkg.NewCancelShieldContext(r.Context())
+
+	// For InitializeRequest HTTP response
+	ctx = context.WithValue(ctx, SessionIDForReturnKey{}, &SessionIDForReturn{})
+
 	outputMsgCh, err := t.receiver.Receive(ctx, r.Header.Get(sessionIDHeader), bs)
 	if err != nil {
 		if errors.Is(err, pkg.ErrSessionClosed) {
@@ -191,7 +201,7 @@ func (t *streamableHTTPServerTransport) handlePost(w http.ResponseWriter, r *htt
 		return
 	}
 
-	if outputMsgCh == nil {
+	if outputMsgCh == nil { // reply response
 		w.WriteHeader(http.StatusAccepted)
 		w.Header().Set("Content-Type", "application/json")
 		return
@@ -202,17 +212,21 @@ func (t *streamableHTTPServerTransport) handlePost(w http.ResponseWriter, r *htt
 		return
 	}
 
-	if msg := <-outputMsgCh; len(msg) != 0 {
-		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Content-Type", "application/json")
-		// if { // 需要想办法获取到sessionid
-		// 	w.Header().Set(sessionIDHeader, "")
-		// }
+	msg := <-outputMsgCh
+	if len(msg) == 0 {
+		t.writeError(w, http.StatusInternalServerError, "handle request fail")
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
 
-		if _, err = w.Write(msg); err != nil {
-			t.logger.Errorf("streamableHTTPServerTransport post write: %+v", err)
-			return
-		}
+	if sid := ctx.Value(SessionIDForReturnKey{}).(*SessionIDForReturn); sid.SessionID != "" { // in server.handleRequestWithInitialize assign
+		w.Header().Set(sessionIDHeader, sid.SessionID)
+	}
+
+	if _, err = w.Write(msg); err != nil {
+		t.logger.Errorf("streamableHTTPServerTransport post write: %+v", err)
+		return
 	}
 }
 

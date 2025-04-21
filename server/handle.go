@@ -5,17 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/yosida95/uritemplate/v3"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
+	"github.com/ThinkInAIXYZ/go-mcp/transport"
 )
 
 func (server *Server) handleRequestWithPing() (*protocol.PingResult, error) {
 	return protocol.NewPingResult(), nil
 }
 
-func (server *Server) handleRequestWithInitialize(sessionID string, rawParams json.RawMessage) (*protocol.InitializeResult, error) {
+func (server *Server) handleRequestWithInitialize(ctx context.Context, sessionID string, rawParams json.RawMessage) (*protocol.InitializeResult, error) {
 	var request *protocol.InitializeRequest
 	if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
 		return nil, err
@@ -23,6 +25,12 @@ func (server *Server) handleRequestWithInitialize(sessionID string, rawParams js
 
 	if request.ProtocolVersion != protocol.Version {
 		return nil, fmt.Errorf("protocol version not supported, supported version is %v", protocol.Version)
+	}
+
+	if midVar, ok := ctx.Value(transport.SessionIDForReturnKey{}).(*transport.SessionIDForReturn); ok {
+		sessionID = uuid.New().String()
+		server.sessionManager.CreateSession(sessionID)
+		midVar.SessionID = sessionID
 	}
 
 	s, ok := server.sessionManager.GetSession(sessionID)

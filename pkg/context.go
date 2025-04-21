@@ -9,6 +9,10 @@ type CancelShieldContext struct {
 	context.Context
 }
 
+func NewCancelShieldContext(ctx context.Context) context.Context {
+	return CancelShieldContext{Context: ctx}
+}
+
 func (v CancelShieldContext) Deadline() (deadline time.Time, ok bool) {
 	return
 }

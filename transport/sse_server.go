@@ -273,30 +273,32 @@ func (t *sseServerTransport) handleMessage(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ctx := pkg.CancelShieldContext{Context: r.Context()}
+	ctx := pkg.NewCancelShieldContext(r.Context())
 	outputMsgCh, err := t.receiver.Receive(ctx, sessionID, inputMsg)
 	if err != nil {
 		t.writeError(w, http.StatusBadRequest, fmt.Sprintf("Failed to receive: %v", err))
 		return
 	}
 
-	if outputMsgCh != nil {
-		go func() {
-			defer pkg.Recover()
+	t.logger.Debugf("Received message: %s", string(inputMsg))
+	w.WriteHeader(http.StatusAccepted)
 
-			if msg := <-outputMsgCh; len(msg) != 0 {
-				if err := t.Send(context.Background(), sessionID, msg); err != nil {
-					t.logger.Errorf("Failed to send message: %v", err)
-				}
-			}
-		}()
+	if outputMsgCh == nil {
+		return
 	}
 
-	// For notifications, just send 202 Accepted with no body
-	t.logger.Debugf("Received message: %s", string(inputMsg))
-	// ref: https://github.com/encode/httpx/blob/master/httpx/_status_codes.py#L8
-	// in official httpx, 2xx is success
-	w.WriteHeader(http.StatusAccepted)
+	go func() {
+		defer pkg.Recover()
+
+		msg := <-outputMsgCh
+		if len(msg) == 0 {
+			t.logger.Errorf("handle request fail")
+			return
+		}
+		if err := t.Send(context.Background(), sessionID, msg); err != nil {
+			t.logger.Errorf("Failed to send message: %v", err)
+		}
+	}()
 }
 
 // writeError writes a JSON-RPC error response with the given error details.

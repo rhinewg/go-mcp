@@ -13,7 +13,7 @@ import (
 )
 
 func (server *Server) receive(ctx context.Context, sessionID string, msg []byte) (<-chan []byte, error) {
-	if !server.sessionManager.IsActiveSession(sessionID) {
+	if sessionID != "" && !server.sessionManager.IsActiveSession(sessionID) {
 		if server.sessionManager.IsClosedSession(sessionID) {
 			return nil, pkg.ErrSessionClosed
 		}
@@ -33,7 +33,7 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 		return nil, nil
 	}
 
-	// 判断 request和response
+	// case request or response
 	if !gjson.GetBytes(msg, "method").Exists() {
 		resp := &protocol.JSONRPCResponse{}
 		if err := pkg.JSONUnmarshal(msg, &resp); err != nil {
@@ -54,6 +54,10 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 	}
 	if !req.IsValid() {
 		return nil, pkg.ErrRequestInvalid
+	}
+
+	if sessionID == "" && req.Method != protocol.Initialize {
+		return nil, pkg.ErrLackSession
 	}
 
 	if req.Method != protocol.Initialize && req.Method != protocol.Ping {
@@ -84,7 +88,7 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 			return
 		}
 		ch <- message
-	}(pkg.CancelShieldContext{Context: ctx})
+	}(pkg.NewCancelShieldContext(ctx))
 	return ch, nil
 }
 
@@ -102,7 +106,7 @@ func (server *Server) receiveRequest(ctx context.Context, sessionID string, requ
 	case protocol.Ping:
 		result, err = server.handleRequestWithPing()
 	case protocol.Initialize:
-		result, err = server.handleRequestWithInitialize(sessionID, request.RawParams)
+		result, err = server.handleRequestWithInitialize(ctx, sessionID, request.RawParams)
 	case protocol.PromptsList:
 		result, err = server.handleRequestWithListPrompts(request.RawParams)
 	case protocol.PromptsGet:
@@ -145,7 +149,7 @@ func (server *Server) receiveRequest(ctx context.Context, sessionID string, requ
 func (server *Server) receiveNotify(sessionID string, notify *protocol.JSONRPCNotification) error {
 	if s, ok := server.sessionManager.GetSession(sessionID); !ok {
 		return pkg.ErrLackSession
-	} else if !s.GetReady() && notify.Method != protocol.NotificationInitialized {
+	} else if notify.Method != protocol.NotificationInitialized && !s.GetReady() {
 		return pkg.ErrSessionHasNotInitialized
 	}
 

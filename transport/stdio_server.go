@@ -112,7 +112,7 @@ func (t *stdioServerTransport) receive(ctx context.Context) {
 			outputMsgCh, err := t.receiver.Receive(ctx, stdioSessionID, s.Bytes())
 			if err != nil {
 				t.logger.Errorf("receiver failed: %v", err)
-				return
+				continue
 			}
 
 			if outputMsgCh == nil {
@@ -122,10 +122,13 @@ func (t *stdioServerTransport) receive(ctx context.Context) {
 			go func() {
 				defer pkg.Recover()
 
-				if msg := <-outputMsgCh; len(msg) != 0 {
-					if err := t.Send(context.Background(), stdioSessionID, msg); err != nil {
-						t.logger.Errorf("Failed to send message: %v", err)
-					}
+				msg := <-outputMsgCh
+				if len(msg) == 0 {
+					t.logger.Errorf("handle request fail")
+					return
+				}
+				if err := t.Send(context.Background(), stdioSessionID, msg); err != nil {
+					t.logger.Errorf("Failed to send message: %v", err)
 				}
 			}()
 		}
