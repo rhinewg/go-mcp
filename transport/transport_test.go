@@ -2,7 +2,6 @@ package transport
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -144,5 +143,4 @@ func testTransport(t *testing.T, client ClientTransport, server ServerTransport)
 	if !reflect.DeepEqual(expectedMsg, testMsg) {
 		t.Fatalf("server.Send() failed: got %v, want %v", expectedMsg, testMsg)
 	}
-	fmt.Printf("client.Send() got %v, want %v", expectedMsg, testMsg)
 }

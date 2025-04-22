@@ -236,7 +236,7 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 			if errors.Is(err, pkg.ErrSendEOF) {
 				return
 			}
-			t.logger.Errorf("sse connect dequeueMessage err: %+v, sessionID=%s", err.Error(), sessionID)
+			t.logger.Debugf("sse connect dequeueMessage err: %+v, sessionID=%s", err.Error(), sessionID)
 			return
 		}
 
