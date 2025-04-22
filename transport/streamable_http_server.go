@@ -15,6 +15,13 @@ import (
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 )
 
+type stateMode string
+
+const (
+	Stateful  stateMode = "stateful"
+	Stateless stateMode = "stateless"
+)
+
 type SessionIDForReturnKey struct{}
 
 type SessionIDForReturn struct {
@@ -35,11 +42,23 @@ func WithStreamableHTTPServerTransportOptionEndpoint(endpoint string) Streamable
 	}
 }
 
+func WithStreamableHTTPServerTransportOptionStateMode(mode stateMode) StreamableHTTPServerTransportOption {
+	return func(t *streamableHTTPServerTransport) {
+		t.stateMode = mode
+	}
+}
+
 type StreamableHTTPServerTransportAndHandlerOption func(*streamableHTTPServerTransport)
 
 func WithStreamableHTTPServerTransportAndHandlerOptionLogger(logger pkg.Logger) StreamableHTTPServerTransportAndHandlerOption {
 	return func(t *streamableHTTPServerTransport) {
 		t.logger = logger
+	}
+}
+
+func WithStreamableHTTPServerTransportAndHandlerOptionStateMode(mode stateMode) StreamableHTTPServerTransportAndHandlerOption {
+	return func(t *streamableHTTPServerTransport) {
+		t.stateMode = mode
 	}
 }
 
@@ -49,6 +68,8 @@ type streamableHTTPServerTransport struct {
 	cancel context.CancelFunc
 
 	httpSvr *http.Server
+
+	stateMode stateMode
 
 	inFlySend sync.WaitGroup
 
@@ -85,9 +106,10 @@ func NewStreamableHTTPServerTransportAndHandler(
 	ctx, cancel := context.WithCancel(context.Background())
 
 	t := &streamableHTTPServerTransport{
-		ctx:    ctx,
-		cancel: cancel,
-		logger: pkg.DefaultLogger,
+		ctx:       ctx,
+		cancel:    cancel,
+		stateMode: Stateless,
+		logger:    pkg.DefaultLogger,
 	}
 
 	for _, opt := range opts {
@@ -103,6 +125,7 @@ func NewStreamableHTTPServerTransport(addr string, opts ...StreamableHTTPServerT
 	t := &streamableHTTPServerTransport{
 		ctx:         ctx,
 		cancel:      cancel,
+		stateMode:   Stateless,
 		logger:      pkg.DefaultLogger,
 		mcpEndpoint: "/mcp", // Default MCP endpoint
 	}
@@ -192,7 +215,9 @@ func (t *streamableHTTPServerTransport) handlePost(w http.ResponseWriter, r *htt
 	ctx := pkg.NewCancelShieldContext(r.Context())
 
 	// For InitializeRequest HTTP response
-	ctx = context.WithValue(ctx, SessionIDForReturnKey{}, &SessionIDForReturn{})
+	if t.stateMode == Stateful {
+		ctx = context.WithValue(ctx, SessionIDForReturnKey{}, &SessionIDForReturn{})
+	}
 
 	outputMsgCh, err := t.receiver.Receive(ctx, r.Header.Get(sessionIDHeader), bs)
 	if err != nil {
@@ -215,10 +240,13 @@ func (t *streamableHTTPServerTransport) handlePost(w http.ResponseWriter, r *htt
 		t.writeError(w, http.StatusInternalServerError, "handle request fail")
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	if sid := ctx.Value(SessionIDForReturnKey{}).(*SessionIDForReturn); sid.SessionID != "" { // in server.handleRequestWithInitialize assign
-		w.Header().Set(sessionIDHeader, sid.SessionID)
+
+	if t.stateMode == Stateful {
+		if sid := ctx.Value(SessionIDForReturnKey{}).(*SessionIDForReturn); sid.SessionID != "" { // in server.handleRequestWithInitialize assign
+			w.Header().Set(sessionIDHeader, sid.SessionID)
+		}
 	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
 	if _, err = w.Write(msg); err != nil {
@@ -231,6 +259,11 @@ func (t *streamableHTTPServerTransport) handleGet(w http.ResponseWriter, r *http
 	defer pkg.RecoverWithFunc(func(_ any) {
 		t.writeError(w, http.StatusInternalServerError, "Internal server error")
 	})
+
+	if t.stateMode == Stateless {
+		t.writeError(w, http.StatusMethodNotAllowed, "server is stateless, not support sse connection")
+		return
+	}
 
 	if !strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
 		t.writeError(w, http.StatusBadRequest, "Must accept text/event-stream")
@@ -245,7 +278,7 @@ func (t *streamableHTTPServerTransport) handleGet(w http.ResponseWriter, r *http
 	// Create flush-supporting writer
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		t.writeError(w, http.StatusInternalServerError, "Streaming not supported")
 		return
 	}
 	sessionID := r.Header.Get(sessionIDHeader)
@@ -254,10 +287,13 @@ func (t *streamableHTTPServerTransport) handleGet(w http.ResponseWriter, r *http
 		flusher.Flush()
 		return
 	}
+	if err := t.sessionManager.OpenMessageQueueForSend(sessionID); err != nil {
+		t.writeError(w, http.StatusBadRequest, err.Error())
+		flusher.Flush()
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
-
-	// t.sessionManager.SendChannleReady()
 
 	for {
 		msg, err := t.sessionManager.DequeueMessageForSend(r.Context(), sessionID)
@@ -291,7 +327,11 @@ func (t *streamableHTTPServerTransport) handleDelete(w http.ResponseWriter, r *h
 }
 
 func (t *streamableHTTPServerTransport) writeError(w http.ResponseWriter, code int, message string) {
-	t.logger.Errorf("streamableHTTPServerTransport Error: code: %d, message: %s", code, message)
+	if code == http.StatusMethodNotAllowed {
+		t.logger.Infof("streamableHTTPServerTransport response: code: %d, message: %s", code, message)
+	} else {
+		t.logger.Errorf("streamableHTTPServerTransport Error: code: %d, message: %s", code, message)
+	}
 
 	resp := protocol.NewJSONRPCErrorResponse(nil, protocol.INTERNAL_ERROR, message)
 	bytes, err := json.Marshal(resp)

@@ -34,12 +34,14 @@ func (server *Server) handleRequestWithInitialize(ctx context.Context, sessionID
 		midVar.SessionID = sessionID
 	}
 
-	s, ok := server.sessionManager.GetSession(sessionID)
-	if !ok {
-		return nil, pkg.ErrLackSession
+	if sessionID != "" {
+		s, ok := server.sessionManager.GetSession(sessionID)
+		if !ok {
+			return nil, pkg.ErrLackSession
+		}
+		s.SetClientInfo(&request.ClientInfo, &request.Capabilities)
+		s.SetReceivedInitRequest()
 	}
-	s.SetClientInfo(&request.ClientInfo, &request.Capabilities)
-	s.SetReceivedInitRequest()
 
 	return &protocol.InitializeResult{
 		ServerInfo:      *server.serverInfo,
@@ -249,6 +251,10 @@ func (server *Server) handleRequestWithCallTool(ctx context.Context, rawParams j
 }
 
 func (server *Server) handleNotifyWithInitialized(sessionID string, rawParams json.RawMessage) error {
+	if sessionID == "" {
+		return nil
+	}
+
 	param := &protocol.InitializedNotification{}
 	if len(rawParams) > 0 {
 		if err := pkg.JSONUnmarshal(rawParams, param); err != nil {

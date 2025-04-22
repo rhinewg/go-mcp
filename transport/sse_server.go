@@ -212,7 +212,7 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 	// Create flush-supporting writer
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		t.writeError(w, http.StatusInternalServerError, "Streaming not supported")
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -229,6 +229,11 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	flusher.Flush()
+
+	if err := t.sessionManager.OpenMessageQueueForSend(sessionID); err != nil {
+		t.logger.Errorf("handleSSE sessionID=%s OpenMessageQueueForSend fail: %v", sessionID, err)
+		return
+	}
 
 	for {
 		msg, err := t.sessionManager.DequeueMessageForSend(r.Context(), sessionID)

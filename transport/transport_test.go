@@ -18,7 +18,16 @@ func newMockSessionManager() *mockSessionManager {
 }
 
 func (m *mockSessionManager) CreateSession(sessionID string) {
+	m.Store(sessionID, nil)
+}
+
+func (m *mockSessionManager) OpenMessageQueueForSend(sessionID string) error {
+	_, ok := m.Load(sessionID)
+	if !ok {
+		return pkg.ErrLackSession
+	}
 	m.Store(sessionID, make(chan []byte))
+	return nil
 }
 
 func (m *mockSessionManager) IsExistSession(sessionID string) bool {

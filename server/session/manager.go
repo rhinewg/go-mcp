@@ -58,6 +58,15 @@ func (m *Manager) GetSession(sessionID string) (*State, bool) {
 	return state, true
 }
 
+func (m *Manager) OpenMessageQueueForSend(sessionID string) error {
+	state, has := m.GetSession(sessionID)
+	if !has {
+		return pkg.ErrLackSession
+	}
+	state.openMessageQueueForSend()
+	return nil
+}
+
 func (m *Manager) EnqueueMessageForSend(ctx context.Context, sessionID string, message []byte) error {
 	state, has := m.GetSession(sessionID)
 	if !has {
