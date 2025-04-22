@@ -82,10 +82,9 @@ func NewStreamableHTTPClientTransport(serverURL string, opts ...StreamableHTTPCl
 
 func (t *streamableHTTPClientTransport) Start() error {
 	// Start a GET stream for server-initiated messages
+	t.sseInFlyConnect.Add(1)
 	go func() {
 		defer pkg.Recover()
-
-		t.sseInFlyConnect.Add(1)
 		defer t.sseInFlyConnect.Done()
 
 		t.startSSEStream()

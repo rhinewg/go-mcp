@@ -21,9 +21,7 @@ func TestStreamableHTTP(t *testing.T) {
 	serverAddr := fmt.Sprintf("127.0.0.1:%d", port)
 	serverURL := fmt.Sprintf("http://%s/mcp", serverAddr)
 
-	if svr, err = NewStreamableHTTPServerTransport(serverAddr); err != nil {
-		t.Fatalf("NewStreamableHTTPServerTransport failed: %v", err)
-	}
+	svr = NewStreamableHTTPServerTransport(serverAddr)
 
 	if client, err = NewStreamableHTTPClientTransport(serverURL); err != nil {
 		t.Fatalf("NewStreamableHTTPClientTransport failed: %v", err)

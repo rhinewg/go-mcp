@@ -10,7 +10,7 @@ import (
 	"github.com/ThinkInAIXYZ/go-mcp/transport"
 )
 
-func TestStreamableHTTP(t *testing.T) {
+func TestStreamableHTTPWithStateless(t *testing.T) {
 	port, err := getAvailablePort()
 	if err != nil {
 		t.Fatalf("Failed to get available port: %v", err)
@@ -21,10 +21,24 @@ func TestStreamableHTTP(t *testing.T) {
 		t.Fatalf("Failed to create transport client: %v", err)
 	}
 
-	test(t, func() error { return runStreamableHTTPServer(port) }, transportClient)
+	test(t, func() error { return runStreamableHTTPServer(port, transport.Stateless) }, transportClient)
 }
 
-func runStreamableHTTPServer(port int) error {
+func TestStreamableHTTPWithStateful(t *testing.T) {
+	port, err := getAvailablePort()
+	if err != nil {
+		t.Fatalf("Failed to get available port: %v", err)
+	}
+
+	transportClient, err := transport.NewStreamableHTTPClientTransport(fmt.Sprintf("http://127.0.0.1:%d/mcp", port))
+	if err != nil {
+		t.Fatalf("Failed to create transport client: %v", err)
+	}
+
+	test(t, func() error { return runStreamableHTTPServer(port, transport.Stateful) }, transportClient)
+}
+
+func runStreamableHTTPServer(port int, stateful transport.StateMode) error {
 	mockServerTrPath, err := compileMockStdioServerTr()
 	if err != nil {
 		return err
@@ -37,5 +51,5 @@ func runStreamableHTTPServer(port int) error {
 		}
 	}(mockServerTrPath)
 
-	return exec.Command(mockServerTrPath, "-transport", "streamable_http", "-port", strconv.Itoa(port)).Run()
+	return exec.Command(mockServerTrPath, "-transport", "streamable_http", "-port", strconv.Itoa(port), "-state_mode", string(stateful)).Run()
 }

@@ -15,11 +15,11 @@ import (
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 )
 
-type stateMode string
+type StateMode string
 
 const (
-	Stateful  stateMode = "stateful"
-	Stateless stateMode = "stateless"
+	Stateful  StateMode = "stateful"
+	Stateless StateMode = "stateless"
 )
 
 type SessionIDForReturnKey struct{}
@@ -42,7 +42,7 @@ func WithStreamableHTTPServerTransportOptionEndpoint(endpoint string) Streamable
 	}
 }
 
-func WithStreamableHTTPServerTransportOptionStateMode(mode stateMode) StreamableHTTPServerTransportOption {
+func WithStreamableHTTPServerTransportOptionStateMode(mode StateMode) StreamableHTTPServerTransportOption {
 	return func(t *streamableHTTPServerTransport) {
 		t.stateMode = mode
 	}
@@ -56,7 +56,7 @@ func WithStreamableHTTPServerTransportAndHandlerOptionLogger(logger pkg.Logger) 
 	}
 }
 
-func WithStreamableHTTPServerTransportAndHandlerOptionStateMode(mode stateMode) StreamableHTTPServerTransportAndHandlerOption {
+func WithStreamableHTTPServerTransportAndHandlerOptionStateMode(mode StateMode) StreamableHTTPServerTransportAndHandlerOption {
 	return func(t *streamableHTTPServerTransport) {
 		t.stateMode = mode
 	}
@@ -69,7 +69,7 @@ type streamableHTTPServerTransport struct {
 
 	httpSvr *http.Server
 
-	stateMode stateMode
+	stateMode StateMode
 
 	inFlySend sync.WaitGroup
 
@@ -119,7 +119,7 @@ func NewStreamableHTTPServerTransportAndHandler(
 	return t, &StreamableHTTPHandler{transport: t}, nil
 }
 
-func NewStreamableHTTPServerTransport(addr string, opts ...StreamableHTTPServerTransportOption) (ServerTransport, error) {
+func NewStreamableHTTPServerTransport(addr string, opts ...StreamableHTTPServerTransportOption) ServerTransport {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	t := &streamableHTTPServerTransport{
@@ -143,7 +143,7 @@ func NewStreamableHTTPServerTransport(addr string, opts ...StreamableHTTPServerT
 		IdleTimeout: time.Minute,
 	}
 
-	return t, nil
+	return t
 }
 
 func (t *streamableHTTPServerTransport) Run() error {
