@@ -230,6 +230,11 @@ func (server *Server) handleRequestWithCallTool(rawParams json.RawMessage) (*pro
 		return nil, err
 	}
 
+	// 检查速率限制
+	if server.limiter != nil && !server.limiter.Allow(request.Name) {
+		return nil, pkg.ErrRateLimitExceeded
+	}
+
 	entry, ok := server.tools.Load(request.Name)
 	if !ok {
 		return nil, fmt.Errorf("missing tool, toolName=%s", request.Name)

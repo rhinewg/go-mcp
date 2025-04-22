@@ -15,6 +15,7 @@ var (
 	ErrSessionHasNotInitialized  = errors.New("the session has not been initialized")
 	ErrLackSession               = errors.New("lack session")
 	ErrSendEOF                   = errors.New("send EOF")
+	ErrRateLimitExceeded         = errors.New("rate limit exceeded")
 )
 
 type ResponseError struct {
