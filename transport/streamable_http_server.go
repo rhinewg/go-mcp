@@ -333,7 +333,7 @@ func (t *streamableHTTPServerTransport) writeError(w http.ResponseWriter, code i
 		t.logger.Errorf("streamableHTTPServerTransport Error: code: %d, message: %s", code, message)
 	}
 
-	resp := protocol.NewJSONRPCErrorResponse(nil, protocol.INTERNAL_ERROR, message)
+	resp := protocol.NewJSONRPCErrorResponse(nil, protocol.InternalError, message)
 	bytes, err := json.Marshal(resp)
 	if err != nil {
 		t.logger.Errorf("streamableHTTPServerTransport writeError json.Marshal: %v", err)

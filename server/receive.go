@@ -129,13 +129,13 @@ func (server *Server) receiveRequest(ctx context.Context, sessionID string, requ
 		var code int
 		switch {
 		case errors.Is(err, pkg.ErrMethodNotSupport):
-			code = protocol.METHOD_NOT_FOUND
+			code = protocol.MethodNotFound
 		case errors.Is(err, pkg.ErrRequestInvalid):
-			code = protocol.INVALID_REQUEST
+			code = protocol.InvalidRequest
 		case errors.Is(err, pkg.ErrJSONUnmarshal):
-			code = protocol.PARSE_ERROR
+			code = protocol.ParseError
 		default:
-			code = protocol.INTERNAL_ERROR
+			code = protocol.InternalError
 		}
 		return protocol.NewJSONRPCErrorResponse(request.ID, code, err.Error())
 	}
@@ -163,9 +163,6 @@ func (server *Server) receiveResponse(sessionID string, response *protocol.JSONR
 	s, ok := server.sessionManager.GetSession(sessionID)
 	if !ok {
 		return pkg.ErrLackSession
-	}
-	if !s.GetReady() {
-		return pkg.ErrSessionHasNotInitialized
 	}
 
 	respChan, ok := s.GetReqID2respChan().Get(fmt.Sprint(response.ID))

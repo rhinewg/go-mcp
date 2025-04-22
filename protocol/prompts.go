@@ -73,6 +73,13 @@ func (m *PromptMessage) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
+	// Try to unmarshal content as AudioContent
+	var audioContent AudioContent
+	if err := pkg.JSONUnmarshal(aux.Content, &audioContent); err == nil {
+		m.Content = audioContent
+		return nil
+	}
+
 	// Try to unmarshal content as embeddedResource
 	var embeddedResource EmbeddedResource
 	if err := pkg.JSONUnmarshal(aux.Content, &embeddedResource); err == nil {

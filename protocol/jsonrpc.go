@@ -10,16 +10,11 @@ const jsonrpcVersion = "2.0"
 
 // Standard JSON-RPC error codes
 const (
-	//nolint:revive
-	PARSE_ERROR = -32700 // Invalid JSON
-	//nolint:revive
-	INVALID_REQUEST = -32600 // The JSON sent is not a valid Request object
-	//nolint:revive
-	METHOD_NOT_FOUND = -32601 // The method does not exist / is not available
-	//nolint:revive
-	INVALID_PARAMS = -32602 // Invalid method parameter(s)
-	//nolint:revive
-	INTERNAL_ERROR = -32603 // Internal JSON-RPC error
+	ParseError     = -32700 // Invalid JSON
+	InvalidRequest = -32600 // The JSON sent is not a valid Request object
+	MethodNotFound = -32601 // The method does not exist / is not available
+	InvalidParams  = -32602 // Invalid method parameter(s)
+	InternalError  = -32603 // Internal JSON-RPC error
 
 	// 可以定义自己的错误代码，范围在-32000 以上。
 )

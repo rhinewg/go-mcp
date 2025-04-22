@@ -187,6 +187,17 @@ func (i ImageContent) GetType() string {
 	return "image"
 }
 
+type AudioContent struct {
+	Annotated
+	Type     string `json:"type"`
+	Data     []byte `json:"data"`
+	MimeType string `json:"mimeType"`
+}
+
+func (i AudioContent) GetType() string {
+	return "audio"
+}
+
 // EmbeddedResource represents the contents of a resource, embedded into a prompt or tool call result.
 // It is up to the client how best to render embedded resources for the benefit of the LLM and/or the user.
 type EmbeddedResource struct {
