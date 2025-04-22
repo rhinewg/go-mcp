@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
 
@@ -17,8 +19,10 @@ func newMockSessionManager() *mockSessionManager {
 	return &mockSessionManager{}
 }
 
-func (m *mockSessionManager) CreateSession(sessionID string) {
+func (m *mockSessionManager) CreateSession() string {
+	sessionID := uuid.NewString()
 	m.Store(sessionID, nil)
+	return sessionID
 }
 
 func (m *mockSessionManager) OpenMessageQueueForSend(sessionID string) error {

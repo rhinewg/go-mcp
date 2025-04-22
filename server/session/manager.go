@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
 
@@ -35,9 +37,11 @@ func (m *Manager) SetLogger(logger pkg.Logger) {
 	m.logger = logger
 }
 
-func (m *Manager) CreateSession(sessionID string) {
+func (m *Manager) CreateSession() string {
+	sessionID := uuid.NewString()
 	state := NewState()
 	m.activeSessions.Store(sessionID, state)
+	return sessionID
 }
 
 func (m *Manager) IsActiveSession(sessionID string) bool {

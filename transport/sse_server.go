@@ -12,8 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
 
@@ -218,8 +216,7 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	// Create an SSE connection
-	sessionID := uuid.NewString()
-	t.sessionManager.CreateSession(sessionID)
+	sessionID := t.sessionManager.CreateSession()
 	defer t.sessionManager.CloseSession(sessionID)
 
 	uri := fmt.Sprintf("%s?sessionID=%s", t.messageEndpointURL, sessionID)

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/yosida95/uritemplate/v3"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
@@ -29,8 +28,7 @@ func (server *Server) handleRequestWithInitialize(ctx context.Context, sessionID
 	protocolVersion := request.ProtocolVersion
 
 	if midVar, ok := ctx.Value(transport.SessionIDForReturnKey{}).(*transport.SessionIDForReturn); ok {
-		sessionID = uuid.New().String()
-		server.sessionManager.CreateSession(sessionID)
+		sessionID = server.sessionManager.CreateSession()
 		midVar.SessionID = sessionID
 	}
 
