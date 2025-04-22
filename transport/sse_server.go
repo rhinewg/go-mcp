@@ -186,7 +186,7 @@ func (t *sseServerTransport) Send(ctx context.Context, sessionID string, msg Mes
 	case <-t.ctx.Done():
 		return t.ctx.Err()
 	default:
-		return t.sessionManager.EnqueueMessage(ctx, sessionID, msg)
+		return t.sessionManager.EnqueueMessageForSend(ctx, sessionID, msg)
 	}
 }
 
@@ -231,11 +231,12 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 	flusher.Flush()
 
 	for {
-		msg, err := t.sessionManager.DequeueMessage(r.Context(), sessionID)
+		msg, err := t.sessionManager.DequeueMessageForSend(r.Context(), sessionID)
 		if err != nil {
-			if !errors.Is(err, pkg.ErrSendEOF) {
-				t.logger.Errorf("sse connect request err: %+v, sessionID=%s", err.Error(), sessionID)
+			if errors.Is(err, pkg.ErrSendEOF) {
+				return
 			}
+			t.logger.Errorf("sse connect dequeueMessage err: %+v, sessionID=%s", err.Error(), sessionID)
 			return
 		}
 

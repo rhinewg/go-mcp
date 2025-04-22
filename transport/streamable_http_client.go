@@ -116,7 +116,11 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 		if req.Header.Get(sessionIDHeader) != "" && resp.StatusCode == http.StatusNotFound {
 			return pkg.ErrSessionClosed
 		}
-		return fmt.Errorf("unexpected status code: %d, status: %s", resp.StatusCode, resp.Status)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read response body: %w", err)
+		}
+		return fmt.Errorf("unexpected status code: %d, status: %s, body=%s", resp.StatusCode, resp.Status, body)
 	}
 
 	// Handle session ID if provided in response
@@ -140,7 +144,11 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 		if resp.StatusCode == http.StatusAccepted { // Handle immediate JSON response
 			return nil
 		}
-		if err = t.receiver.Receive(ctx, msg); err != nil {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read response body: %w", err)
+		}
+		if err = t.receiver.Receive(ctx, body); err != nil {
 			return fmt.Errorf("failed to process response: %w", err)
 		}
 		return nil

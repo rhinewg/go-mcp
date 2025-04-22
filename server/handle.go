@@ -23,9 +23,10 @@ func (server *Server) handleRequestWithInitialize(ctx context.Context, sessionID
 		return nil, err
 	}
 
-	if request.ProtocolVersion != protocol.Version {
+	if _, ok := protocol.SupportedVersion[request.ProtocolVersion]; !ok {
 		return nil, fmt.Errorf("protocol version not supported, supported version is %v", protocol.Version)
 	}
+	protocolVersion := request.ProtocolVersion
 
 	if midVar, ok := ctx.Value(transport.SessionIDForReturnKey{}).(*transport.SessionIDForReturn); ok {
 		sessionID = uuid.New().String()
@@ -43,7 +44,7 @@ func (server *Server) handleRequestWithInitialize(ctx context.Context, sessionID
 	return &protocol.InitializeResult{
 		ServerInfo:      *server.serverInfo,
 		Capabilities:    *server.capabilities,
-		ProtocolVersion: protocol.Version,
+		ProtocolVersion: protocolVersion,
 		Instructions:    server.instructions,
 	}, nil
 }

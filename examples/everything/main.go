@@ -72,10 +72,16 @@ func getTransport() (t transport.ServerTransport) {
 	if mode == "stdio" {
 		log.Println("start current time mcp server with stdio transport")
 		t = transport.NewStdioServerTransport()
-	} else {
+	} else if mode == "sse" {
 		addr := fmt.Sprintf("127.0.0.1:%s", port)
 		log.Printf("start current time mcp server with sse transport, listen %s", addr)
 		t, _ = transport.NewSSEServerTransport(addr)
+	} else if mode == "streamable_http" {
+		addr := fmt.Sprintf("127.0.0.1:%s", port)
+		log.Printf("start current time mcp server with streamable_http transport, listen %s", addr)
+		t, _ = transport.NewStreamableHTTPServerTransport(addr)
+	} else {
+		panic(fmt.Errorf("unknown mode: %s", mode))
 	}
 
 	return t

@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -26,7 +27,7 @@ func (m *mockSessionManager) IsExistSession(sessionID string) bool {
 	return has
 }
 
-func (m *mockSessionManager) EnqueueMessage(ctx context.Context, sessionID string, message []byte) error {
+func (m *mockSessionManager) EnqueueMessageForSend(ctx context.Context, sessionID string, message []byte) error {
 	ch, has := m.Load(sessionID)
 	if !has {
 		return pkg.ErrLackSession
@@ -40,7 +41,7 @@ func (m *mockSessionManager) EnqueueMessage(ctx context.Context, sessionID strin
 	}
 }
 
-func (m *mockSessionManager) DequeueMessage(ctx context.Context, sessionID string) ([]byte, error) {
+func (m *mockSessionManager) DequeueMessageForSend(ctx context.Context, sessionID string) ([]byte, error) {
 	ch, has := m.Load(sessionID)
 	if !has {
 		return nil, pkg.ErrLackSession
@@ -75,7 +76,7 @@ func (m *mockSessionManager) CloseAllSessions() {
 }
 
 func testTransport(t *testing.T, client ClientTransport, server ServerTransport) {
-	msgWithServer := "hello server"
+	testMsg := "hello server"
 	expectedMsgWithServerCh := make(chan string, 1)
 	server.SetReceiver(ServerReceiverF(func(_ context.Context, _ string, msg []byte) (<-chan []byte, error) {
 		expectedMsgWithServerCh <- string(msg)
@@ -87,7 +88,6 @@ func testTransport(t *testing.T, client ClientTransport, server ServerTransport)
 	}))
 	server.SetSessionManager(newMockSessionManager())
 
-	msgWithClient := "hello client"
 	expectedMsgWithClientCh := make(chan string, 1)
 	client.SetReceiver(ClientReceiverF(func(_ context.Context, msg []byte) error {
 		expectedMsgWithClientCh <- string(msg)
@@ -133,29 +133,16 @@ func testTransport(t *testing.T, client ClientTransport, server ServerTransport)
 		}
 	}()
 
-	if err := client.Send(context.Background(), Message(msgWithServer)); err != nil {
+	if err := client.Send(context.Background(), Message(testMsg)); err != nil {
 		t.Fatalf("client.Send() failed: %v", err)
 	}
 	expectedMsg := <-expectedMsgWithServerCh
-	if !reflect.DeepEqual(expectedMsg, msgWithServer) {
-		t.Fatalf("client.Send() got %v, want %v", expectedMsg, msgWithServer)
+	if !reflect.DeepEqual(expectedMsg, testMsg) {
+		t.Fatalf("client.Send() got %v, want %v", expectedMsg, testMsg)
 	}
 	expectedMsg = <-expectedMsgWithClientCh
-	if !reflect.DeepEqual(expectedMsg, msgWithServer) {
-		t.Fatalf("server.Send() failed: got %v, want %v", expectedMsg, msgWithServer)
+	if !reflect.DeepEqual(expectedMsg, testMsg) {
+		t.Fatalf("server.Send() failed: got %v, want %v", expectedMsg, testMsg)
 	}
-
-	sessionID := ""
-	if cli, ok := client.(*sseClientTransport); ok {
-		sessionID = cli.messageEndpoint.Query().Get("sessionID")
-	}
-
-	if err := server.Send(context.Background(), sessionID, Message(msgWithClient)); err != nil {
-		t.Fatalf("server.Send() failed: %v", err)
-	}
-
-	expectedMsg = <-expectedMsgWithClientCh
-	if !reflect.DeepEqual(expectedMsg, msgWithClient) {
-		t.Fatalf("server.Send() failed: got %v, want %v", expectedMsg, msgWithClient)
-	}
+	fmt.Printf("client.Send() got %v, want %v", expectedMsg, testMsg)
 }

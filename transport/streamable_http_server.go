@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
+	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 )
 
 type SessionIDForReturnKey struct{}
@@ -141,7 +143,7 @@ func (t *streamableHTTPServerTransport) Send(ctx context.Context, sessionID stri
 	case <-t.ctx.Done():
 		return t.ctx.Err()
 	default:
-		return t.sessionManager.EnqueueMessage(ctx, sessionID, msg)
+		return t.sessionManager.EnqueueMessageForSend(ctx, sessionID, msg)
 	}
 }
 
@@ -203,13 +205,8 @@ func (t *streamableHTTPServerTransport) handlePost(w http.ResponseWriter, r *htt
 	}
 
 	if outputMsgCh == nil { // reply response
-		w.WriteHeader(http.StatusAccepted)
 		w.Header().Set("Content-Type", "application/json")
-		return
-	}
-
-	if !strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
-		t.writeError(w, http.StatusBadRequest, "Must accept text/event-stream")
+		w.WriteHeader(http.StatusAccepted)
 		return
 	}
 
@@ -218,12 +215,11 @@ func (t *streamableHTTPServerTransport) handlePost(w http.ResponseWriter, r *htt
 		t.writeError(w, http.StatusInternalServerError, "handle request fail")
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
-
 	if sid := ctx.Value(SessionIDForReturnKey{}).(*SessionIDForReturn); sid.SessionID != "" { // in server.handleRequestWithInitialize assign
 		w.Header().Set(sessionIDHeader, sid.SessionID)
 	}
+	w.WriteHeader(http.StatusOK)
 
 	if _, err = w.Write(msg); err != nil {
 		t.logger.Errorf("streamableHTTPServerTransport post write: %+v", err)
@@ -252,21 +248,24 @@ func (t *streamableHTTPServerTransport) handleGet(w http.ResponseWriter, r *http
 		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	flusher.Flush()
-
 	sessionID := r.Header.Get(sessionIDHeader)
 	if sessionID == "" {
 		t.writeError(w, http.StatusBadRequest, "Missing Session ID")
+		flusher.Flush()
 		return
 	}
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	// t.sessionManager.SendChannleReady()
 
 	for {
-		msg, err := t.sessionManager.DequeueMessage(r.Context(), sessionID)
+		msg, err := t.sessionManager.DequeueMessageForSend(r.Context(), sessionID)
 		if err != nil {
-			if !errors.Is(err, pkg.ErrSendEOF) {
-				t.logger.Errorf("SSE stream getMessageForSend: %v, sessionID=%s", err, sessionID)
+			if errors.Is(err, pkg.ErrSendEOF) {
+				return
 			}
+			t.logger.Errorf("sse connect dequeueMessage err: %+v, sessionID=%s", err.Error(), sessionID)
 			return
 		}
 
@@ -294,10 +293,17 @@ func (t *streamableHTTPServerTransport) handleDelete(w http.ResponseWriter, r *h
 func (t *streamableHTTPServerTransport) writeError(w http.ResponseWriter, code int, message string) {
 	t.logger.Errorf("streamableHTTPServerTransport Error: code: %d, message: %s", code, message)
 
-	w.Header().Set("Content-Type", "text/plain")
+	resp := protocol.NewJSONRPCErrorResponse(nil, protocol.INTERNAL_ERROR, message)
+	bytes, err := json.Marshal(resp)
+	if err != nil {
+		t.logger.Errorf("streamableHTTPServerTransport writeError json.Marshal: %v", err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	if _, err := w.Write([]byte(message)); err != nil {
-		t.logger.Errorf("streamableHTTPServerTransport writeError: %v", err)
+	if _, err := w.Write(bytes); err != nil {
+		t.logger.Errorf("streamableHTTPServerTransport writeError Write: %v", err)
 	}
 }
 
