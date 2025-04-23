@@ -64,7 +64,11 @@ func generateSchemaFromReqStruct(v any) (*InputSchema, error) {
 }
 
 func getTypeUUID(t reflect.Type) string {
-	return t.PkgPath() + "/" + t.Name()
+	if t.PkgPath() != "" && t.Name() != "" {
+		return t.PkgPath() + "." + t.Name()
+	}
+	// fallback for unnamed types (like anonymous struct)
+	return t.String()
 }
 
 func reflectSchemaByObject(t reflect.Type) (*Property, error) {
