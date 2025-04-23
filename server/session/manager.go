@@ -11,7 +11,7 @@ import (
 
 type Manager struct {
 	activeSessions pkg.SyncMap[*State]
-	closedSessions pkg.SyncMap[*State]
+	closedSessions pkg.SyncMap[struct{}]
 
 	stopHeartbeat chan struct{}
 
@@ -55,6 +55,9 @@ func (m *Manager) IsClosedSession(sessionID string) bool {
 }
 
 func (m *Manager) GetSession(sessionID string) (*State, bool) {
+	if sessionID == "" {
+		return nil, false
+	}
 	state, has := m.activeSessions.Load(sessionID)
 	if !has {
 		return nil, false
@@ -101,7 +104,7 @@ func (m *Manager) CloseSession(sessionID string) {
 		return
 	}
 	state.Close()
-	m.closedSessions.Store(sessionID, state)
+	m.closedSessions.Store(sessionID, struct{}{})
 }
 
 func (m *Manager) CloseAllSessions() {

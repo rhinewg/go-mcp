@@ -109,7 +109,9 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
-	defer resp.Body.Close()
+	if resp.Header.Get("Content-Type") != "text/event-stream" {
+		defer resp.Body.Close()
+	}
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		if req.Header.Get(sessionIDHeader) != "" && resp.StatusCode == http.StatusNotFound {
