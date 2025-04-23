@@ -335,7 +335,6 @@ func compareProperty(a, b *Property) bool {
 	if !compareProperty(a.Items, b.Items) {
 		return false
 	}
-
 	// compare Properties field
 	if len(a.Properties) != len(b.Properties) {
 		return false
