@@ -14,6 +14,7 @@ var (
 	ErrJSONUnmarshal             = errors.New("json unmarshal error")
 	ErrSessionHasNotInitialized  = errors.New("the session has not been initialized")
 	ErrLackSession               = errors.New("lack session")
+	ErrSessionClosed             = errors.New("session closed")
 	ErrSendEOF                   = errors.New("send EOF")
 )
 

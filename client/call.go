@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"sync/atomic"
@@ -220,7 +221,7 @@ func (client *Client) sendNotification4Initialized(ctx context.Context) error {
 // Responsible for request and response assembly
 func (client *Client) callServer(ctx context.Context, method protocol.Method, params protocol.ClientRequest) (json.RawMessage, error) {
 	if !client.ready.Load() && (method != protocol.Initialize && method != protocol.Ping) {
-		return nil, fmt.Errorf("client not ready")
+		return nil, errors.New("callServer: client not ready")
 	}
 
 	requestID := strconv.FormatInt(atomic.AddInt64(&client.requestID, 1), 10)

@@ -10,12 +10,12 @@ import (
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
 
-const mockSessionID = "mock"
-
 type mockServerTransport struct {
 	receiver serverReceiver
 	in       io.ReadCloser
 	out      io.Writer
+
+	sessionID string
 
 	sessionManager sessionManager
 
@@ -39,7 +39,7 @@ func (t *mockServerTransport) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.cancel = cancel
 
-	t.sessionManager.CreateSession(mockSessionID)
+	t.sessionID = t.sessionManager.CreateSession()
 
 	t.receive(ctx)
 
@@ -87,10 +87,28 @@ func (t *mockServerTransport) receive(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			if err := t.receiver.Receive(ctx, mockSessionID, s.Bytes()); err != nil {
+			outputMsgCh, err := t.receiver.Receive(ctx, t.sessionID, s.Bytes())
+			if err != nil {
 				t.logger.Errorf("receiver failed: %v", err)
 				continue
 			}
+
+			if outputMsgCh == nil {
+				continue
+			}
+
+			go func() {
+				defer pkg.Recover()
+
+				msg := <-outputMsgCh
+				if len(msg) == 0 {
+					t.logger.Errorf("handle request fail")
+					return
+				}
+				if err := t.Send(context.Background(), t.sessionID, msg); err != nil {
+					t.logger.Errorf("Failed to send message: %v", err)
+				}
+			}()
 		}
 	}
 

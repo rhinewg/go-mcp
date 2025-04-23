@@ -160,7 +160,6 @@ func Test_Validate(t *testing.T) {
 			},
 			Required: []string{"string"},
 		}}, false},
-		// 嵌套匿名结构体测试
 		{"nested anonymous struct", args{data: map[string]any{
 			"user": map[string]any{
 				"name": "test",

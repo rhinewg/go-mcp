@@ -283,7 +283,7 @@ func compareInputSchema(a, b *InputSchema) bool {
 		return false
 	}
 
-	// 比较Required字段
+	// compare required field
 	if len(a.Required) != len(b.Required) {
 		return false
 	}
@@ -331,12 +331,11 @@ func compareProperty(a, b *Property) bool {
 		return false
 	}
 
-	// 比较Items字段
+	// compare Items field
 	if !compareProperty(a.Items, b.Items) {
 		return false
 	}
-
-	// 比较Properties字段
+	// compare Properties field
 	if len(a.Properties) != len(b.Properties) {
 		return false
 	}
@@ -350,7 +349,7 @@ func compareProperty(a, b *Property) bool {
 		}
 	}
 
-	// 比较Required字段
+	// compare Required field比
 	if len(a.Required) != len(b.Required) {
 		return false
 	}

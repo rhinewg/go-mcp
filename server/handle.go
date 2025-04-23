@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -8,33 +9,42 @@ import (
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
+	"github.com/ThinkInAIXYZ/go-mcp/transport"
 )
 
 func (server *Server) handleRequestWithPing() (*protocol.PingResult, error) {
 	return protocol.NewPingResult(), nil
 }
 
-func (server *Server) handleRequestWithInitialize(sessionID string, rawParams json.RawMessage) (*protocol.InitializeResult, error) {
+func (server *Server) handleRequestWithInitialize(ctx context.Context, sessionID string, rawParams json.RawMessage) (*protocol.InitializeResult, error) {
 	var request *protocol.InitializeRequest
 	if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
 		return nil, err
 	}
 
-	if request.ProtocolVersion != protocol.Version {
+	if _, ok := protocol.SupportedVersion[request.ProtocolVersion]; !ok {
 		return nil, fmt.Errorf("protocol version not supported, supported version is %v", protocol.Version)
 	}
+	protocolVersion := request.ProtocolVersion
 
-	s, ok := server.sessionManager.GetSession(sessionID)
-	if !ok {
-		return nil, pkg.ErrLackSession
+	if midVar, ok := ctx.Value(transport.SessionIDForReturnKey{}).(*transport.SessionIDForReturn); ok {
+		sessionID = server.sessionManager.CreateSession()
+		midVar.SessionID = sessionID
 	}
-	s.SetClientInfo(&request.ClientInfo, &request.Capabilities)
-	s.SetReceivedInitRequest()
+
+	if sessionID != "" {
+		s, ok := server.sessionManager.GetSession(sessionID)
+		if !ok {
+			return nil, pkg.ErrLackSession
+		}
+		s.SetClientInfo(&request.ClientInfo, &request.Capabilities)
+		s.SetReceivedInitRequest()
+	}
 
 	return &protocol.InitializeResult{
 		ServerInfo:      *server.serverInfo,
 		Capabilities:    *server.capabilities,
-		ProtocolVersion: protocol.Version,
+		ProtocolVersion: protocolVersion,
 		Instructions:    server.instructions,
 	}, nil
 }
@@ -62,7 +72,7 @@ func (server *Server) handleRequestWithListPrompts(rawParams json.RawMessage) (*
 	}, nil
 }
 
-func (server *Server) handleRequestWithGetPrompt(rawParams json.RawMessage) (*protocol.GetPromptResult, error) {
+func (server *Server) handleRequestWithGetPrompt(ctx context.Context, rawParams json.RawMessage) (*protocol.GetPromptResult, error) {
 	if server.capabilities.Prompts == nil {
 		return nil, pkg.ErrServerNotSupport
 	}
@@ -76,7 +86,7 @@ func (server *Server) handleRequestWithGetPrompt(rawParams json.RawMessage) (*pr
 	if !ok {
 		return nil, fmt.Errorf("missing prompt, promptName=%s", request.Name)
 	}
-	return entry.handler(request)
+	return entry.handler(ctx, request)
 }
 
 func (server *Server) handleRequestWithListResources(rawParams json.RawMessage) (*protocol.ListResourcesResult, error) {
@@ -125,7 +135,7 @@ func (server *Server) handleRequestWithListResourceTemplates(rawParams json.RawM
 	}, nil
 }
 
-func (server *Server) handleRequestWithReadResource(rawParams json.RawMessage) (*protocol.ReadResourceResult, error) {
+func (server *Server) handleRequestWithReadResource(ctx context.Context, rawParams json.RawMessage) (*protocol.ReadResourceResult, error) {
 	if server.capabilities.Resources == nil {
 		return nil, pkg.ErrServerNotSupport
 	}
@@ -156,7 +166,7 @@ func (server *Server) handleRequestWithReadResource(rawParams json.RawMessage) (
 	if handler == nil {
 		return nil, fmt.Errorf("missing resource, resourceName=%s", request.URI)
 	}
-	return handler(request)
+	return handler(ctx, request)
 }
 
 func matchesTemplate(uri string, template *uritemplate.Template) bool {
@@ -220,7 +230,7 @@ func (server *Server) handleRequestWithListTools(rawParams json.RawMessage) (*pr
 	return &protocol.ListToolsResult{Tools: tools}, nil
 }
 
-func (server *Server) handleRequestWithCallTool(rawParams json.RawMessage) (*protocol.CallToolResult, error) {
+func (server *Server) handleRequestWithCallTool(ctx context.Context, rawParams json.RawMessage) (*protocol.CallToolResult, error) {
 	if server.capabilities.Tools == nil {
 		return nil, pkg.ErrServerNotSupport
 	}
@@ -235,10 +245,14 @@ func (server *Server) handleRequestWithCallTool(rawParams json.RawMessage) (*pro
 		return nil, fmt.Errorf("missing tool, toolName=%s", request.Name)
 	}
 
-	return entry.handler(request)
+	return entry.handler(ctx, request)
 }
 
 func (server *Server) handleNotifyWithInitialized(sessionID string, rawParams json.RawMessage) error {
+	if sessionID == "" {
+		return nil
+	}
+
 	param := &protocol.InitializedNotification{}
 	if len(rawParams) > 0 {
 		if err := pkg.JSONUnmarshal(rawParams, param); err != nil {

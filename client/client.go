@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	cmap "github.com/orcaman/concurrent-map/v2"
@@ -47,7 +48,8 @@ type Client struct {
 
 	requestID int64
 
-	ready *pkg.AtomicBool
+	ready            *pkg.AtomicBool
+	initializationMu sync.Mutex
 
 	clientInfo         *protocol.Implementation
 	clientCapabilities *protocol.ClientCapabilities

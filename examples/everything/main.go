@@ -63,25 +63,32 @@ func main() {
 }
 
 func getTransport() (t transport.ServerTransport) {
-	mode := ""
-	port := ""
-	flag.StringVar(&mode, "transport", "stdio", "The transport to use, should be \"stdio\" or \"sse\"")
+	var mode, port, stateMode string
+	flag.StringVar(&mode, "transport", "streamable_http", "The transport to use, should be \"stdio\" or \"sse\" or \"streamable_http\"")
 	flag.StringVar(&port, "port", "8080", "sse server address")
+	flag.StringVar(&stateMode, "state_mode", "stateless", "streamable_http server state mode, should be \"stateless\" or \"stateful\"")
 	flag.Parse()
 
-	if mode == "stdio" {
+	switch mode {
+	case "stdio":
 		log.Println("start current time mcp server with stdio transport")
 		t = transport.NewStdioServerTransport()
-	} else {
+	case "sse":
 		addr := fmt.Sprintf("127.0.0.1:%s", port)
 		log.Printf("start current time mcp server with sse transport, listen %s", addr)
 		t, _ = transport.NewSSEServerTransport(addr)
+	case "streamable_http":
+		addr := fmt.Sprintf("127.0.0.1:%s", port)
+		log.Printf("start current time mcp server with streamable_http transport, listen %s", addr)
+		t = transport.NewStreamableHTTPServerTransport(addr, transport.WithStreamableHTTPServerTransportOptionStateMode(transport.StateMode(stateMode)))
+	default:
+		panic(fmt.Errorf("unknown mode: %s", mode))
 	}
 
 	return t
 }
 
-func currentTime(request *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+func currentTime(_ context.Context, request *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
 	req := new(currentTimeReq)
 	if err := protocol.VerifyAndUnmarshal(request.RawArguments, &req); err != nil {
 		return nil, err

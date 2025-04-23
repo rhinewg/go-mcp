@@ -67,19 +67,20 @@ type ServerTransport interface {
 }
 
 type serverReceiver interface {
-	Receive(ctx context.Context, sessionID string, msg []byte) error
+	Receive(ctx context.Context, sessionID string, msg []byte) (<-chan []byte, error)
 }
 
-type ServerReceiverF func(ctx context.Context, sessionID string, msg []byte) error
+type ServerReceiverF func(ctx context.Context, sessionID string, msg []byte) (<-chan []byte, error)
 
-func (f ServerReceiverF) Receive(ctx context.Context, sessionID string, msg []byte) error {
+func (f ServerReceiverF) Receive(ctx context.Context, sessionID string, msg []byte) (<-chan []byte, error) {
 	return f(ctx, sessionID, msg)
 }
 
 type sessionManager interface {
-	CreateSession(sessionID string)
-	SendMessage(ctx context.Context, sessionID string, message []byte) error
-	GetMessageForSend(ctx context.Context, sessionID string) ([]byte, error)
+	CreateSession() string
+	OpenMessageQueueForSend(sessionID string) error
+	EnqueueMessageForSend(ctx context.Context, sessionID string, message []byte) error
+	DequeueMessageForSend(ctx context.Context, sessionID string) ([]byte, error)
 	CloseSession(sessionID string)
 	CloseAllSessions()
 }

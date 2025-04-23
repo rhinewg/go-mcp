@@ -12,8 +12,6 @@ import (
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
 
-const stdioSessionID = "stdio"
-
 type StdioServerTransportOption func(*stdioServerTransport)
 
 func WithStdioServerOptionLogger(log pkg.Logger) StdioServerTransportOption {
@@ -28,6 +26,7 @@ type stdioServerTransport struct {
 	writer   io.Writer
 
 	sessionManager sessionManager
+	sessionID      string
 
 	logger pkg.Logger
 
@@ -54,7 +53,7 @@ func (t *stdioServerTransport) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.cancel = cancel
 
-	t.sessionManager.CreateSession(stdioSessionID)
+	t.sessionID = t.sessionManager.CreateSession()
 
 	t.receive(ctx)
 
@@ -108,10 +107,29 @@ func (t *stdioServerTransport) receive(ctx context.Context) {
 				t.logger.Debugf("skipping empty message")
 				continue
 			}
-			if err := t.receiver.Receive(ctx, stdioSessionID, s.Bytes()); err != nil {
+
+			outputMsgCh, err := t.receiver.Receive(ctx, t.sessionID, s.Bytes())
+			if err != nil {
 				t.logger.Errorf("receiver failed: %v", err)
 				continue
 			}
+
+			if outputMsgCh == nil {
+				continue
+			}
+
+			go func() {
+				defer pkg.Recover()
+
+				msg := <-outputMsgCh
+				if len(msg) == 0 {
+					t.logger.Errorf("handle request fail")
+					return
+				}
+				if err := t.Send(context.Background(), t.sessionID, msg); err != nil {
+					t.logger.Errorf("Failed to send message: %v", err)
+				}
+			}()
 		}
 	}
 
