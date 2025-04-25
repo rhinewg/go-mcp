@@ -2,6 +2,7 @@ package transport
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -41,7 +42,7 @@ func (t *mockServerTransport) Run() error {
 
 	t.sessionID = t.sessionManager.CreateSession()
 
-	t.receive(ctx)
+	t.startReceive(ctx)
 
 	close(t.receiveShutDone)
 	return nil
@@ -79,43 +80,52 @@ func (t *mockServerTransport) Shutdown(userCtx context.Context, serverCtx contex
 	}
 }
 
-func (t *mockServerTransport) receive(ctx context.Context) {
-	s := bufio.NewScanner(t.in)
+func (t *mockServerTransport) startReceive(ctx context.Context) {
+	s := bufio.NewReader(t.in)
 
-	for s.Scan() {
+	for {
+		line, err := s.ReadBytes('\n')
+		if err != nil {
+			if errors.Is(err, io.ErrClosedPipe) || // This error occurs during unit tests, suppressing it here
+				errors.Is(err, io.EOF) {
+				return
+			}
+			t.logger.Errorf("client receive unexpected error reading input: %v", err)
+			return
+		}
+
+		line = bytes.TrimRight(line, "\n")
+
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			outputMsgCh, err := t.receiver.Receive(ctx, t.sessionID, s.Bytes())
-			if err != nil {
-				t.logger.Errorf("receiver failed: %v", err)
-				continue
-			}
-
-			if outputMsgCh == nil {
-				continue
-			}
-
-			go func() {
-				defer pkg.Recover()
-
-				msg := <-outputMsgCh
-				if len(msg) == 0 {
-					t.logger.Errorf("handle request fail")
-					return
-				}
-				if err := t.Send(context.Background(), t.sessionID, msg); err != nil {
-					t.logger.Errorf("Failed to send message: %v", err)
-				}
-			}()
+			t.receive(ctx, line)
 		}
 	}
+}
 
-	if err := s.Err(); err != nil {
-		if !errors.Is(err, io.ErrClosedPipe) { // This error occurs during unit tests, suppressing it here
-			t.logger.Errorf("server server unexpected error reading input: %v", err)
-		}
+func (t *mockServerTransport) receive(ctx context.Context, line []byte) {
+	outputMsgCh, err := t.receiver.Receive(ctx, t.sessionID, line)
+	if err != nil {
+		t.logger.Errorf("receiver failed: %v", err)
 		return
 	}
+
+	if outputMsgCh == nil {
+		return
+	}
+
+	go func() {
+		defer pkg.Recover()
+
+		msg := <-outputMsgCh
+		if len(msg) == 0 {
+			t.logger.Errorf("handle request fail")
+			return
+		}
+		if err := t.Send(context.Background(), t.sessionID, msg); err != nil {
+			t.logger.Errorf("Failed to send message: %v", err)
+		}
+	}()
 }
