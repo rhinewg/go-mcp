@@ -20,15 +20,15 @@ func (client *Client) initialization(ctx context.Context, request *protocol.Init
 		return nil, err
 	}
 	var result protocol.InitializeResult
-	if err := pkg.JSONUnmarshal(response, &result); err != nil {
+	if err = pkg.JSONUnmarshal(response, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	if result.ProtocolVersion != request.ProtocolVersion {
-		return nil, fmt.Errorf("protocol version mismatch, expected %s, got %s", request.ProtocolVersion, result.ProtocolVersion)
+	if _, ok := protocol.SupportedVersion[request.ProtocolVersion]; !ok {
+		return nil, fmt.Errorf("protocol version not supported, supported lastest version is %v", protocol.Version)
 	}
 
-	if err := client.sendNotification4Initialized(ctx); nil != err {
+	if err = client.sendNotification4Initialized(ctx); err != nil {
 		return nil, fmt.Errorf("failed to send InitializedNotification: %w", err)
 	}
 
