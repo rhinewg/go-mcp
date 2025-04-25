@@ -24,7 +24,7 @@ func (client *Client) initialization(ctx context.Context, request *protocol.Init
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	if _, ok := protocol.SupportedVersion[request.ProtocolVersion]; !ok {
+	if _, ok := protocol.SupportedVersion[result.ProtocolVersion]; !ok {
 		return nil, fmt.Errorf("protocol version not supported, supported lastest version is %v", protocol.Version)
 	}
 
