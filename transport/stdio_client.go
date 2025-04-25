@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
@@ -33,6 +34,7 @@ type stdioClientTransport struct {
 	receiver clientReceiver
 	reader   io.Reader
 	writer   io.WriteCloser
+	readerr  io.Reader
 
 	logger pkg.Logger
 
@@ -55,10 +57,17 @@ func NewStdioClientTransport(command string, args []string, opts ...StdioClientT
 		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
 	}
 
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
 	t := &stdioClientTransport{
-		cmd:             cmd,
-		reader:          stdout,
-		writer:          stdin,
+		cmd:     cmd,
+		reader:  stdout,
+		writer:  stdin,
+		readerr: stderr,
+
 		logger:          pkg.DefaultLogger,
 		receiveShutDone: make(chan struct{}),
 	}
@@ -76,13 +85,27 @@ func (t *stdioClientTransport) Start() error {
 
 	innerCtx, cancel := context.WithCancel(context.Background())
 	t.cancel = cancel
+	var wg sync.WaitGroup
 
+	wg.Add(1)
 	go func() {
 		defer pkg.Recover()
 
 		t.receive(innerCtx)
 		close(t.receiveShutDone)
+		wg.Done()
 	}()
+
+	wg.Add(1)
+	go func() {
+		defer pkg.Recover()
+
+		t.receivestderr(innerCtx)
+		close(t.receiveShutDone)
+		wg.Done()
+	}()
+
+	wg.Wait()
 
 	return nil
 }
@@ -130,6 +153,28 @@ func (t *stdioClientTransport) receive(ctx context.Context) {
 	if err := s.Err(); err != nil {
 		if !errors.Is(err, io.ErrClosedPipe) { // This error occurs during unit tests, suppressing it here
 			t.logger.Errorf("client receive unexpected error reading input: %v", err)
+		}
+		return
+	}
+}
+func (t *stdioClientTransport) receivestderr(ctx context.Context) {
+	s := bufio.NewScanner(t.readerr)
+
+	for s.Scan() {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			if err := t.receiver.Receive(ctx, s.Bytes()); err != nil {
+				t.logger.Errorf("server error received: %v", err)
+				return
+			}
+		}
+	}
+
+	if err := s.Err(); err != nil {
+		if !errors.Is(err, io.ErrClosedPipe) { // This error occurs during unit tests, suppressing it here
+			t.logger.Errorf("client receive stderr unexpected error reading input: %v", err)
 		}
 		return
 	}
