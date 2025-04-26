@@ -39,8 +39,8 @@ type stdioClientTransport struct {
 
 	logger pkg.Logger
 
-	cancel          context.CancelFunc
-	receiveShutDone chan struct{}
+	wg     sync.WaitGroup
+	cancel context.CancelFunc
 }
 
 func NewStdioClientTransport(command string, args []string, opts ...StdioClientTransportOption) (ClientTransport, error) {
@@ -69,8 +69,7 @@ func NewStdioClientTransport(command string, args []string, opts ...StdioClientT
 		writer:  stdin,
 		readerr: stderr,
 
-		logger:          pkg.DefaultLogger,
-		receiveShutDone: make(chan struct{}),
+		logger: pkg.DefaultLogger,
 	}
 
 	for _, opt := range opts {
@@ -86,27 +85,22 @@ func (t *stdioClientTransport) Start() error {
 
 	innerCtx, cancel := context.WithCancel(context.Background())
 	t.cancel = cancel
-	var wg sync.WaitGroup
 
-	wg.Add(1)
+	t.wg.Add(1)
 	go func() {
 		defer pkg.Recover()
-
+		defer t.wg.Done()
 		t.startReceive(innerCtx)
-		close(t.receiveShutDone)
-		wg.Done()
+
 	}()
 
-	wg.Add(1)
+	t.wg.Add(1)
 	go func() {
 		defer pkg.Recover()
+		defer t.wg.Done()
+		t.receiveStderr(innerCtx)
 
-		t.receivestderr(innerCtx)
-		close(t.receiveShutDone)
-		wg.Done()
 	}()
-
-	wg.Wait()
 
 	return nil
 }
@@ -131,7 +125,7 @@ func (t *stdioClientTransport) Close() error {
 		return err
 	}
 
-	<-t.receiveShutDone
+	t.wg.Wait()
 
 	return nil
 }
@@ -168,25 +162,36 @@ func (t *stdioClientTransport) startReceive(ctx context.Context) {
 		}
 	}
 }
-func (t *stdioClientTransport) receivestderr(ctx context.Context) {
-	s := bufio.NewScanner(t.readerr)
 
-	for s.Scan() {
+func (t *stdioClientTransport) receiveStderr(ctx context.Context) {
+	s := bufio.NewReader(t.readerr)
+
+	for {
+		line, err := s.ReadBytes('\n')
+		if err != nil {
+			if errors.Is(err, io.ErrClosedPipe) || // This error occurs during unit tests, suppressing it here
+				errors.Is(err, io.EOF) {
+				return
+			}
+			t.logger.Errorf("client receive unexpected server error reading input: %v", err)
+			return
+		}
+
+		line = bytes.TrimRight(line, "\n")
+		// filter empty messages
+		// filter space messages and \t messages
+		if len(bytes.TrimFunc(line, func(r rune) bool { return r == ' ' || r == '\t' })) == 0 {
+			t.logger.Debugf("skipping empty message")
+			continue
+		}
+
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			if err := t.receiver.Receive(ctx, s.Bytes()); err != nil {
-				t.logger.Errorf("server error received: %v", err)
-				return
+			if err = t.receiver.Receive(ctx, line); err != nil {
+				t.logger.Errorf("server stderr receiver failed: %v", err)
 			}
 		}
-	}
-
-	if err := s.Err(); err != nil {
-		if !errors.Is(err, io.ErrClosedPipe) { // This error occurs during unit tests, suppressing it here
-			t.logger.Errorf("client receive stderr unexpected error reading input: %v", err)
-		}
-		return
 	}
 }
