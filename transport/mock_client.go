@@ -2,6 +2,7 @@ package transport
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -37,7 +38,7 @@ func (t *mockClientTransport) Start() error {
 	go func() {
 		defer pkg.Recover()
 
-		t.receive(ctx)
+		t.startReceive(ctx)
 
 		close(t.receiveShutDone)
 	}()
@@ -68,25 +69,29 @@ func (t *mockClientTransport) Close() error {
 	return nil
 }
 
-func (t *mockClientTransport) receive(ctx context.Context) {
-	s := bufio.NewScanner(t.in)
+func (t *mockClientTransport) startReceive(ctx context.Context) {
+	s := bufio.NewReader(t.in)
 
-	for s.Scan() {
+	for {
+		line, err := s.ReadBytes('\n')
+		if err != nil {
+			if errors.Is(err, io.ErrClosedPipe) || // This error occurs during unit tests, suppressing it here
+				errors.Is(err, io.EOF) {
+				return
+			}
+			t.logger.Errorf("client receive unexpected error reading input: %v", err)
+			return
+		}
+
+		line = bytes.TrimRight(line, "\n")
+
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			if err := t.receiver.Receive(ctx, s.Bytes()); err != nil {
+			if err = t.receiver.Receive(ctx, line); err != nil {
 				t.logger.Errorf("receiver failed: %v", err)
-				return
 			}
 		}
-	}
-
-	if err := s.Err(); err != nil {
-		if !errors.Is(err, io.ErrClosedPipe) { // This error occurs during unit tests, suppressing it here
-			t.logger.Errorf("unexpected error reading input: %v", err)
-		}
-		return
 	}
 }

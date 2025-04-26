@@ -23,7 +23,7 @@ func (server *Server) handleRequestWithInitialize(ctx context.Context, sessionID
 	}
 
 	if _, ok := protocol.SupportedVersion[request.ProtocolVersion]; !ok {
-		return nil, fmt.Errorf("protocol version not supported, supported version is %v", protocol.Version)
+		return nil, fmt.Errorf("protocol version not supported, supported lastest version is %v", protocol.Version)
 	}
 	protocolVersion := request.ProtocolVersion
 

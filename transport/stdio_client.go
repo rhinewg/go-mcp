@@ -2,6 +2,7 @@ package transport
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -91,7 +92,7 @@ func (t *stdioClientTransport) Start() error {
 	go func() {
 		defer pkg.Recover()
 
-		t.receive(innerCtx)
+		t.startReceive(innerCtx)
 		close(t.receiveShutDone)
 		wg.Done()
 	}()
@@ -135,26 +136,36 @@ func (t *stdioClientTransport) Close() error {
 	return nil
 }
 
-func (t *stdioClientTransport) receive(ctx context.Context) {
-	s := bufio.NewScanner(t.reader)
+func (t *stdioClientTransport) startReceive(ctx context.Context) {
+	s := bufio.NewReader(t.reader)
 
-	for s.Scan() {
+	for {
+		line, err := s.ReadBytes('\n')
+		if err != nil {
+			if errors.Is(err, io.ErrClosedPipe) || // This error occurs during unit tests, suppressing it here
+				errors.Is(err, io.EOF) {
+				return
+			}
+			t.logger.Errorf("client receive unexpected error reading input: %v", err)
+			return
+		}
+
+		line = bytes.TrimRight(line, "\n")
+		// filter empty messages
+		// filter space messages and \t messages
+		if len(bytes.TrimFunc(line, func(r rune) bool { return r == ' ' || r == '\t' })) == 0 {
+			t.logger.Debugf("skipping empty message")
+			continue
+		}
+
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			if err := t.receiver.Receive(ctx, s.Bytes()); err != nil {
+			if err = t.receiver.Receive(ctx, line); err != nil {
 				t.logger.Errorf("receiver failed: %v", err)
-				return
 			}
 		}
-	}
-
-	if err := s.Err(); err != nil {
-		if !errors.Is(err, io.ErrClosedPipe) { // This error occurs during unit tests, suppressing it here
-			t.logger.Errorf("client receive unexpected error reading input: %v", err)
-		}
-		return
 	}
 }
 func (t *stdioClientTransport) receivestderr(ctx context.Context) {
