@@ -21,9 +21,10 @@ func WithStdioServerOptionLogger(log pkg.Logger) StdioServerTransportOption {
 }
 
 type stdioServerTransport struct {
-	receiver serverReceiver
-	reader   io.ReadCloser
-	writer   io.Writer
+	receiver  serverReceiver
+	reader    io.ReadCloser
+	writer    io.Writer
+	writerror io.WriteCloser
 
 	sessionManager sessionManager
 	sessionID      string
@@ -36,9 +37,10 @@ type stdioServerTransport struct {
 
 func NewStdioServerTransport(opts ...StdioServerTransportOption) ServerTransport {
 	t := &stdioServerTransport{
-		reader: os.Stdin,
-		writer: os.Stdout,
-		logger: pkg.DefaultLogger,
+		reader:    os.Stdin,
+		writer:    os.Stdout,
+		writerror: os.Stderr,
+		logger:    pkg.DefaultLogger,
 
 		receiveShutDone: make(chan struct{}),
 	}
@@ -64,6 +66,13 @@ func (t *stdioServerTransport) Run() error {
 func (t *stdioServerTransport) Send(_ context.Context, _ string, msg Message) error {
 	if _, err := t.writer.Write(append(msg, mcpMessageDelimiter)); err != nil {
 		return fmt.Errorf("failed to write: %w", err)
+	}
+	return nil
+}
+
+func (t *stdioServerTransport) Senderr(_ context.Context, _ string, msg Message) error {
+	if _, err := t.writerror.Write(append(msg, mcpMessageDelimiter)); err != nil {
+		return fmt.Errorf("server failed to write: %w", err)
 	}
 	return nil
 }
