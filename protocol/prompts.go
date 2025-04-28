@@ -8,12 +8,14 @@ import (
 )
 
 // ListPromptsRequest represents a request to list available prompts
-type ListPromptsRequest struct{}
+type ListPromptsRequest struct {
+	Cursor Cursor `json:"cursor,omitempty"`
+}
 
 // ListPromptsResult represents the response to a list prompts request
 type ListPromptsResult struct {
 	Prompts    []Prompt `json:"prompts"`
-	NextCursor string   `json:"nextCursor,omitempty"`
+	NextCursor Cursor   `json:"nextCursor,omitempty"`
 }
 
 // Prompt related types
@@ -101,7 +103,7 @@ func NewListPromptsRequest() *ListPromptsRequest {
 }
 
 // NewListPromptsResult creates a new list prompts response
-func NewListPromptsResult(prompts []Prompt, nextCursor string) *ListPromptsResult {
+func NewListPromptsResult(prompts []Prompt, nextCursor Cursor) *ListPromptsResult {
 	return &ListPromptsResult{
 		Prompts:    prompts,
 		NextCursor: nextCursor,

@@ -10,7 +10,9 @@ import (
 )
 
 // ListResourcesRequest Sent from the client to request a list of resources the server has.
-type ListResourcesRequest struct{}
+type ListResourcesRequest struct {
+	Cursor Cursor `json:"cursor,omitempty"`
+}
 
 // ListResourcesResult The server's response to a resources/list request from the client.
 type ListResourcesResult struct {
@@ -19,16 +21,18 @@ type ListResourcesResult struct {
 	 * An opaque token representing the pagination position after the last returned result.
 	 * If present, there may be more results available.
 	 */
-	NextCursor string `json:"nextCursor,omitempty"`
+	NextCursor Cursor `json:"nextCursor,omitempty"`
 }
 
 // ListResourceTemplatesRequest represents a request to list resource templates
-type ListResourceTemplatesRequest struct{}
+type ListResourceTemplatesRequest struct {
+	Cursor Cursor `json:"cursor,omitempty"`
+}
 
 // ListResourceTemplatesResult represents the response to a list resource templates request
 type ListResourceTemplatesResult struct {
 	ResourceTemplates []ResourceTemplate `json:"resourceTemplates"`
-	NextCursor        string             `json:"nextCursor,omitempty"`
+	NextCursor        Cursor             `json:"nextCursor,omitempty"`
 }
 
 // ReadResourceRequest represents a request to read a specific resource
@@ -282,7 +286,7 @@ func NewListResourcesRequest() *ListResourcesRequest {
 }
 
 // NewListResourcesResult creates a new list resources response
-func NewListResourcesResult(resources []Resource, nextCursor string) *ListResourcesResult {
+func NewListResourcesResult(resources []Resource, nextCursor Cursor) *ListResourcesResult {
 	return &ListResourcesResult{
 		Resources:  resources,
 		NextCursor: nextCursor,
@@ -295,7 +299,7 @@ func NewListResourceTemplatesRequest() *ListResourceTemplatesRequest {
 }
 
 // NewListResourceTemplatesResult creates a new list resource templates response
-func NewListResourceTemplatesResult(templates []ResourceTemplate, nextCursor string) *ListResourceTemplatesResult {
+func NewListResourceTemplatesResult(templates []ResourceTemplate, nextCursor Cursor) *ListResourceTemplatesResult {
 	return &ListResourceTemplatesResult{
 		ResourceTemplates: templates,
 		NextCursor:        nextCursor,
