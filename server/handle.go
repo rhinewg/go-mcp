@@ -248,7 +248,7 @@ func (server *Server) handleRequestWithListTools(rawParams json.RawMessage) (*pr
 			return nil, err
 		}
 	}
-	
+
 	tools := make([]*protocol.Tool, 0)
 	server.tools.Range(func(_ string, entry *toolEntry) bool {
 		tools = append(tools, entry.tool)

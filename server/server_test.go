@@ -695,7 +695,7 @@ func TestServerHandleForPage(t *testing.T) {
 
 				var respStruct = struct {
 					Jsonrpc string      `json:"jsonrpc"`
-					Id      interface{} `json:"id"`
+					ID      interface{} `json:"id"`
 					Result  struct {
 						NextCursor        string        `json:"nextCursor"`
 						Tools             []interface{} `json:"tools"`
@@ -722,7 +722,8 @@ func TestServerHandleForPage(t *testing.T) {
 						tt.request = protocol.ListResourcesRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
 					}
 					req = protocol.NewJSONRPCRequest(uuid, tt.method, tt.request)
-					totalResq = totalResq + len(respStruct.Result.Tools) + len(respStruct.Result.Prompts) + len(respStruct.Result.Resources) + len(respStruct.Result.ResourceTemplates)
+					totalResq = totalResq + len(respStruct.Result.Tools) + len(respStruct.Result.Prompts) +
+						len(respStruct.Result.Resources) + len(respStruct.Result.ResourceTemplates)
 				}
 			}
 			if total != totalResq {
