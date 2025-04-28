@@ -124,14 +124,19 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 		return fmt.Errorf("unexpected status code: %d, status: %s, body=%s", resp.StatusCode, resp.Status, body)
 	}
 
+	if resp.StatusCode == http.StatusAccepted {
+		return nil // Handle immediate JSON response
+	}
+
 	// Handle session ID if provided in response
 	if respSessionID := resp.Header.Get(sessionIDHeader); respSessionID != "" {
 		t.sessionID.Store(respSessionID)
 	}
 
+	contentType := resp.Header.Get("Content-Type")
 	// Handle different response types
-	switch resp.Header.Get("Content-Type") {
-	case "text/event-stream":
+	switch {
+	case contentType == "text/event-stream":
 		go func() {
 			defer pkg.Recover()
 
@@ -141,7 +146,7 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 			t.handleSSEStream(resp.Body)
 		}()
 		return nil
-	case "application/json":
+	case isJSONContentType(contentType):
 		if resp.StatusCode == http.StatusAccepted { // Handle immediate JSON response
 			return nil
 		}
@@ -154,8 +159,15 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 		}
 		return nil
 	default:
-		return fmt.Errorf("unexpected content type: %s", resp.Header.Get("Content-Type"))
+		return fmt.Errorf("unexpected content type: %s", contentType)
 	}
+}
+
+// isJSONContentType checks if the content type is JSON, regardless of additional parameters
+func isJSONContentType(contentType string) bool {
+	return strings.HasPrefix(contentType, "application/json") ||
+		strings.HasPrefix(contentType, "application/hal+json") ||
+		strings.HasPrefix(contentType, "application/problem+json")
 }
 
 func (t *streamableHTTPClientTransport) startSSEStream() {
