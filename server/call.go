@@ -23,7 +23,7 @@ func (server *Server) Ping(ctx context.Context, request *protocol.PingRequest) (
 	}
 
 	var result protocol.PingResult
-	if err := pkg.JSONUnmarshal(response, &result); err != nil {
+	if err = pkg.JSONUnmarshal(response, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 	return &result, nil
@@ -50,7 +50,7 @@ func (server *Server) Sampling(ctx context.Context, request *protocol.CreateMess
 	}
 
 	var result protocol.CreateMessageResult
-	if err := pkg.JSONUnmarshal(response, &result); err != nil {
+	if err = pkg.JSONUnmarshal(response, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 	return &result, nil

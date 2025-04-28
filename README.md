@@ -144,7 +144,7 @@ func handleTimeRequest(ctx context.Context, req *protocol.CallToolRequest) (*pro
 
 	return &protocol.CallToolResult{
 		Content: []protocol.Content{
-			protocol.TextContent{
+			&protocol.TextContent{
 				Type: "text",
 				Text: time.Now().In(loc).String(),
 			},
