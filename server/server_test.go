@@ -692,7 +692,6 @@ func TestServerHandleForPage(t *testing.T) {
 						t.Fatalf("outScan: %+v", err)
 					}
 				}
-
 				var respStruct = struct {
 					Jsonrpc string      `json:"jsonrpc"`
 					ID      interface{} `json:"id"`
@@ -710,26 +709,26 @@ func TestServerHandleForPage(t *testing.T) {
 
 				if respStruct.Result.NextCursor == "" {
 					break
-				} else {
-					switch tt.method {
-					case protocol.ToolsList:
-						tt.request = protocol.ListToolsRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
-					case protocol.PromptsList:
-						tt.request = protocol.ListPromptsRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
-					case protocol.ResourceListTemplates:
-						tt.request = protocol.ListResourceTemplatesRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
-					case protocol.ResourcesList:
-						tt.request = protocol.ListResourcesRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
-					}
-					req = protocol.NewJSONRPCRequest(uuid, tt.method, tt.request)
-					totalResq = totalResq + len(respStruct.Result.Tools) + len(respStruct.Result.Prompts) +
-						len(respStruct.Result.Resources) + len(respStruct.Result.ResourceTemplates)
 				}
+				switch tt.method {
+				case protocol.ToolsList:
+					tt.request = protocol.ListToolsRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
+				case protocol.PromptsList:
+					tt.request = protocol.ListPromptsRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
+				case protocol.ResourceListTemplates:
+					tt.request = protocol.ListResourceTemplatesRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
+				case protocol.ResourcesList:
+					tt.request = protocol.ListResourcesRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
+				}
+				req = protocol.NewJSONRPCRequest(uuid, tt.method, tt.request)
+				totalResq = totalResq + len(respStruct.Result.Tools) + len(respStruct.Result.Prompts) +
+					len(respStruct.Result.Resources) + len(respStruct.Result.ResourceTemplates)
+
 			}
 			if total != totalResq {
 				t.Fatalf("totalResq: %d, total: %d", totalResq, total)
 			}
-			t.Logf("totalResq: %d,total:%d", totalResq, total)
+			// t.Logf("totalResq: %d,total:%d", totalResq, total)
 		})
 	}
 }
