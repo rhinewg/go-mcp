@@ -692,7 +692,7 @@ func TestServerHandleForPage(t *testing.T) {
 						t.Fatalf("outScan: %+v", err)
 					}
 				}
-				var respStruct = struct {
+				respStruct := struct {
 					Jsonrpc string      `json:"jsonrpc"`
 					ID      interface{} `json:"id"`
 					Result  struct {
@@ -723,7 +723,6 @@ func TestServerHandleForPage(t *testing.T) {
 				req = protocol.NewJSONRPCRequest(uuid, tt.method, tt.request)
 				totalResq = totalResq + len(respStruct.Result.Tools) + len(respStruct.Result.Prompts) +
 					len(respStruct.Result.Resources) + len(respStruct.Result.ResourceTemplates)
-
 			}
 			if total != totalResq {
 				t.Fatalf("totalResq: %d, total: %d", totalResq, total)
