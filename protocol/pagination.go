@@ -35,7 +35,6 @@ func PaginationLimit[T any](allElements []T, cursor Cursor, limit int) ([]T, Cur
 	// set the next cursor
 	nextCursor := func() Cursor {
 		if len(elementsToReturn) >= limit {
-			// fmt.Printf("-=====%+v\n", elementsToReturn[len(elementsToReturn)-1])
 			element := elementsToReturn[len(elementsToReturn)-1]
 			val := reflect.ValueOf(element)
 			var nc string
