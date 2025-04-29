@@ -159,11 +159,14 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 }
 
 func (t *streamableHTTPClientTransport) startSSEStream() {
+	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
 	for {
+		timer.Reset(time.Second)
 		select {
 		case <-t.ctx.Done():
 			return
-		case <-time.After(time.Second):
+		case <-timer.C:
 			sessionID := t.sessionID.Load()
 			if sessionID == "" {
 				continue // Try again after 1 second, waiting for the POST request to initialize the SessionID to complete
