@@ -162,6 +162,7 @@ func (t *streamableHTTPClientTransport) startSSEStream() {
 	timer := time.NewTimer(time.Second)
 	defer timer.Stop()
 	for {
+		timer.Reset(time.Second)
 		select {
 		case <-t.ctx.Done():
 			return
