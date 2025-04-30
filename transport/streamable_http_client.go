@@ -146,7 +146,7 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 			t.handleSSEStream(resp.Body)
 		}()
 		return nil
-	case isJSONContentType(contentType):
+	case strings.HasPrefix(contentType, "application/json"):
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("failed to read response body: %w", err)
@@ -158,11 +158,6 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 	default:
 		return fmt.Errorf("unexpected content type: %s", contentType)
 	}
-}
-
-// isJSONContentType checks if the content type is JSON, regardless of additional parameters
-func isJSONContentType(contentType string) bool {
-	return strings.HasPrefix(contentType, "application/json")
 }
 
 func (t *streamableHTTPClientTransport) startSSEStream() {
