@@ -34,18 +34,18 @@ func PaginationLimit[T any](allElements []T, cursor Cursor, limit int) ([]T, Cur
 	elementsToReturn := allElements[startPos:endPos]
 	// set the next cursor
 	nextCursor := func() Cursor {
-		if len(elementsToReturn) >= limit {
-			element := elementsToReturn[len(elementsToReturn)-1]
-			val := reflect.ValueOf(element)
-			var nc string
-			if val.Kind() == reflect.Ptr {
-				val = val.Elem()
-			}
-			nc = val.FieldByName("Name").String()
-			toString := base64.StdEncoding.EncodeToString([]byte(nc))
-			return Cursor(toString)
+		if len(elementsToReturn) < limit {
+			return ""
 		}
-		return ""
+		element := elementsToReturn[len(elementsToReturn)-1]
+		val := reflect.ValueOf(element)
+		var nc string
+		if val.Kind() == reflect.Ptr {
+			val = val.Elem()
+		}
+		nc = val.FieldByName("Name").String()
+		toString := base64.StdEncoding.EncodeToString([]byte(nc))
+		return Cursor(toString)
 	}()
 	return elementsToReturn, nextCursor, nil
 }
