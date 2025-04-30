@@ -124,14 +124,19 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 		return fmt.Errorf("unexpected status code: %d, status: %s, body=%s", resp.StatusCode, resp.Status, body)
 	}
 
+	if resp.StatusCode == http.StatusAccepted {
+		return nil // Handle immediate JSON response
+	}
+
 	// Handle session ID if provided in response
 	if respSessionID := resp.Header.Get(sessionIDHeader); respSessionID != "" {
 		t.sessionID.Store(respSessionID)
 	}
 
+	contentType := resp.Header.Get("Content-Type")
 	// Handle different response types
-	switch resp.Header.Get("Content-Type") {
-	case "text/event-stream":
+	switch {
+	case contentType == "text/event-stream":
 		go func() {
 			defer pkg.Recover()
 
@@ -141,10 +146,7 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 			t.handleSSEStream(resp.Body)
 		}()
 		return nil
-	case "application/json":
-		if resp.StatusCode == http.StatusAccepted { // Handle immediate JSON response
-			return nil
-		}
+	case isJSONContentType(contentType):
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("failed to read response body: %w", err)
@@ -154,16 +156,24 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 		}
 		return nil
 	default:
-		return fmt.Errorf("unexpected content type: %s", resp.Header.Get("Content-Type"))
+		return fmt.Errorf("unexpected content type: %s", contentType)
 	}
 }
 
+// isJSONContentType checks if the content type is JSON, regardless of additional parameters
+func isJSONContentType(contentType string) bool {
+	return strings.HasPrefix(contentType, "application/json")
+}
+
 func (t *streamableHTTPClientTransport) startSSEStream() {
+	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
 	for {
+		timer.Reset(time.Second)
 		select {
 		case <-t.ctx.Done():
 			return
-		case <-time.After(time.Second):
+		case <-timer.C:
 			sessionID := t.sessionID.Load()
 			if sessionID == "" {
 				continue // Try again after 1 second, waiting for the POST request to initialize the SessionID to complete
