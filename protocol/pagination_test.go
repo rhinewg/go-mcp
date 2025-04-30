@@ -10,14 +10,14 @@ import (
 func BenchmarkPaginationLimit(b *testing.B) {
 	list := getTools(10000)
 	for i := 0; i < b.N; i++ {
-		PaginationLimit[Tool](list, "dG9vbDMz", 10)
+		_, _, _ = PaginationLimit[Tool](list, "dG9vbDMz", 10)
 	}
 }
 
 func BenchmarkPaginationLimitForTool(b *testing.B) {
 	list := getTools(10000)
 	for i := 0; i < b.N; i++ {
-		PaginationLimitForTool(list, "dG9vbDMz", 10)
+		_, _, _ = PaginationLimitForTool(list, "dG9vbDMz", 10)
 	}
 }
 
