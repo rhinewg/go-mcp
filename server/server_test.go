@@ -552,7 +552,7 @@ func TestServerHandleForPage(t *testing.T) {
 			return
 		}
 
-		testToolCallContent := protocol.TextContent{
+		testToolCallContent := &protocol.TextContent{
 			Type: "text",
 			Text: fmt.Sprintf("pong_%d", i),
 		}
