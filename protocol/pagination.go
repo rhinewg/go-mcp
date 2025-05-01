@@ -9,6 +9,10 @@ import (
 // Cursor is an opaque token used to represent a cursor for pagination.
 type Cursor string
 
+type Named interface {
+	GetName() string
+}
+
 func PaginationLimit[T any](allElements []T, cursor Cursor, limit int) ([]T, Cursor, error) {
 	startPos := 0
 	if cursor != "" {

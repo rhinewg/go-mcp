@@ -97,6 +97,10 @@ type Resource struct {
 	Size     int64  `json:"size,omitempty"`
 }
 
+func (r Resource) GetName() string {
+	return r.Name
+}
+
 type ResourceTemplate struct {
 	Annotated
 	Name              string                `json:"name"`
@@ -104,6 +108,10 @@ type ResourceTemplate struct {
 	URITemplateParsed *uritemplate.Template `json:"-"`
 	Description       string                `json:"description,omitempty"`
 	MimeType          string                `json:"mimeType,omitempty"`
+}
+
+func (rt ResourceTemplate) GetName() string {
+	return rt.Name
 }
 
 func (t *ResourceTemplate) UnmarshalJSON(data []byte) error {

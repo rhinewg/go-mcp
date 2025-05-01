@@ -25,6 +25,10 @@ type Prompt struct {
 	Arguments   []PromptArgument `json:"arguments,omitempty"`
 }
 
+func (p Prompt) GetName() string {
+	return p.Name
+}
+
 type PromptArgument struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`

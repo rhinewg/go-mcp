@@ -32,6 +32,14 @@ type Tool struct {
 	RawInputSchema json.RawMessage `json:"-"`
 }
 
+/*func (t *Tool) GetName() string {
+	return t.Name
+}*/
+
+func (t *Tool) GetName() string {
+	return t.Name
+}
+
 func (t *Tool) MarshalJSON() ([]byte, error) {
 	m := make(map[string]interface{}, 3)
 
