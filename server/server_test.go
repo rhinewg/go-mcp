@@ -67,7 +67,7 @@ func TestServerHandle(t *testing.T) {
 	}
 	server.RegisterTool(testTool, func(_ context.Context, _ *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
 		return &protocol.CallToolResult{
-			Content: []protocol.Content{testToolCallContent},
+			Content: []protocol.Content{&testToolCallContent},
 		}, nil
 	})
 
@@ -153,7 +153,7 @@ func TestServerHandle(t *testing.T) {
 			},
 			expectedResponse: protocol.CallToolResult{
 				Content: []protocol.Content{
-					testToolCallContent,
+					&testToolCallContent,
 				},
 			},
 		},
@@ -365,7 +365,7 @@ func TestServerNotify(t *testing.T) {
 			f: func() {
 				server.RegisterTool(testTool, func(context.Context, *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
 					return &protocol.CallToolResult{
-						Content: []protocol.Content{testToolCallContent},
+						Content: []protocol.Content{&testToolCallContent},
 					}, nil
 				})
 			},

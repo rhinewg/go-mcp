@@ -197,10 +197,6 @@ func (server *Server) handleRequestWithReadResource(ctx context.Context, rawPara
 	return handler(ctx, request)
 }
 
-func matchesTemplate(uri string, template *uritemplate.Template) bool {
-	return template.Regexp().MatchString(uri)
-}
-
 func (server *Server) handleRequestWithSubscribeResourceChange(sessionID string, rawParams json.RawMessage) (*protocol.SubscribeResult, error) {
 	if server.capabilities.Resources == nil && !server.capabilities.Resources.Subscribe {
 		return nil, pkg.ErrServerNotSupport
@@ -307,4 +303,8 @@ func (server *Server) handleNotifyWithInitialized(sessionID string, rawParams js
 	}
 	s.SetReady()
 	return nil
+}
+
+func matchesTemplate(uri string, template *uritemplate.Template) bool {
+	return template.Regexp().MatchString(uri)
 }
