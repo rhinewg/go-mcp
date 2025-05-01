@@ -3,14 +3,15 @@ package protocol
 import (
 	"encoding/base64"
 	"fmt"
+	"reflect"
 	"sort"
 	"testing"
 )
 
-func BenchmarkPaginationLimit(b *testing.B) {
+func BenchmarkPaginationLimitForReflect(b *testing.B) {
 	list := getTools(10000)
 	for i := 0; i < b.N; i++ {
-		_, _, _ = PaginationLimit[*Tool](list, "dG9vbDMz", 10)
+		_, _, _ = PaginationLimitForReflect[*Tool](list, "dG9vbDMz", 10)
 	}
 }
 
@@ -21,10 +22,10 @@ func BenchmarkPaginationLimitForTool(b *testing.B) {
 	}
 }
 
-func BenchmarkPaginationLimitForNamed(b *testing.B) {
+func BenchmarkPaginationLimit(b *testing.B) {
 	list := getTools(10000)
 	for i := 0; i < b.N; i++ {
-		_, _, _ = PaginationLimitForNamed[*Tool](list, "dG9vbDMz", 10)
+		_, _, _ = PaginationLimit[*Tool](list, "dG9vbDMz", 10)
 	}
 }
 
@@ -70,7 +71,7 @@ func PaginationLimitForTool(allElements []*Tool, cursor Cursor, limit int) ([]*T
 	return elementsToReturn, nextCursor, nil
 }
 
-func PaginationLimitForNamed[T Named](allElements []T, cursor Cursor, limit int) ([]T, Cursor, error) {
+func PaginationLimitForReflect[T any](allElements []T, cursor Cursor, limit int) ([]T, Cursor, error) {
 	startPos := 0
 	if cursor != "" {
 		c, err := base64.StdEncoding.DecodeString(string(cursor))
@@ -79,7 +80,12 @@ func PaginationLimitForNamed[T Named](allElements []T, cursor Cursor, limit int)
 		}
 		cString := string(c)
 		startPos = sort.Search(len(allElements), func(i int) bool {
-			nc := allElements[i].GetName()
+			val := reflect.ValueOf(allElements[i])
+			var nc string
+			if val.Kind() == reflect.Ptr {
+				val = val.Elem()
+			}
+			nc = val.FieldByName("Name").String()
 			return nc > cString
 		})
 	}
@@ -94,7 +100,12 @@ func PaginationLimitForNamed[T Named](allElements []T, cursor Cursor, limit int)
 			return ""
 		}
 		element := elementsToReturn[len(elementsToReturn)-1]
-		nc := element.GetName()
+		val := reflect.ValueOf(element)
+		var nc string
+		if val.Kind() == reflect.Ptr {
+			val = val.Elem()
+		}
+		nc = val.FieldByName("Name").String()
 		toString := base64.StdEncoding.EncodeToString([]byte(nc))
 		return Cursor(toString)
 	}()

@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"encoding/base64"
-	"reflect"
 	"sort"
 )
 
@@ -13,7 +12,7 @@ type Named interface {
 	GetName() string
 }
 
-func PaginationLimit[T any](allElements []T, cursor Cursor, limit int) ([]T, Cursor, error) {
+func PaginationLimit[T Named](allElements []T, cursor Cursor, limit int) ([]T, Cursor, error) {
 	startPos := 0
 	if cursor != "" {
 		c, err := base64.StdEncoding.DecodeString(string(cursor))
@@ -22,12 +21,7 @@ func PaginationLimit[T any](allElements []T, cursor Cursor, limit int) ([]T, Cur
 		}
 		cString := string(c)
 		startPos = sort.Search(len(allElements), func(i int) bool {
-			val := reflect.ValueOf(allElements[i])
-			var nc string
-			if val.Kind() == reflect.Ptr {
-				val = val.Elem()
-			}
-			nc = val.FieldByName("Name").String()
+			nc := allElements[i].GetName()
 			return nc > cString
 		})
 	}
@@ -42,12 +36,7 @@ func PaginationLimit[T any](allElements []T, cursor Cursor, limit int) ([]T, Cur
 			return ""
 		}
 		element := elementsToReturn[len(elementsToReturn)-1]
-		val := reflect.ValueOf(element)
-		var nc string
-		if val.Kind() == reflect.Ptr {
-			val = val.Elem()
-		}
-		nc = val.FieldByName("Name").String()
+		nc := element.GetName()
 		toString := base64.StdEncoding.EncodeToString([]byte(nc))
 		return Cursor(toString)
 	}()
