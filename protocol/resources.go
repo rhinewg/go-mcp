@@ -110,8 +110,8 @@ type ResourceTemplate struct {
 	MimeType          string                `json:"mimeType,omitempty"`
 }
 
-func (rt ResourceTemplate) GetName() string {
-	return rt.Name
+func (t ResourceTemplate) GetName() string {
+	return t.Name
 }
 
 func (t *ResourceTemplate) UnmarshalJSON(data []byte) error {
