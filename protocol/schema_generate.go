@@ -64,7 +64,11 @@ func generateSchemaFromReqStruct(v any) (*InputSchema, error) {
 }
 
 func getTypeUUID(t reflect.Type) string {
-	return t.PkgPath() + "/" + t.Name()
+	if t.PkgPath() != "" && t.Name() != "" {
+		return t.PkgPath() + "." + t.Name()
+	}
+	// fallback for unnamed types (like anonymous struct)
+	return t.String()
 }
 
 func reflectSchemaByObject(t reflect.Type) (*Property, error) {
@@ -176,6 +180,14 @@ func reflectSchemaByType(t reflect.Type) (*Property, error) {
 		}
 		object.Type = ObjectT
 		s = object
+	case reflect.Map:
+		if t.Key().Kind() != reflect.String {
+			return nil, fmt.Errorf("map key type %s is not supported", t.Key().Kind())
+		}
+		object := &Property{
+			Type: ObjectT,
+		}
+		s = object
 	case reflect.Ptr:
 		p, err := reflectSchemaByType(t.Elem())
 		if err != nil {
@@ -183,7 +195,7 @@ func reflectSchemaByType(t reflect.Type) (*Property, error) {
 		}
 		s = p
 	case reflect.Invalid, reflect.Uintptr, reflect.Complex64, reflect.Complex128,
-		reflect.Chan, reflect.Func, reflect.Interface, reflect.Map,
+		reflect.Chan, reflect.Func, reflect.Interface,
 		reflect.UnsafePointer:
 		return nil, fmt.Errorf("unsupported type: %s", t.Kind().String())
 	default:

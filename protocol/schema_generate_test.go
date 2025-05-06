@@ -1,7 +1,7 @@
 package protocol
 
 import (
-	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -152,6 +152,139 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name: "anonymous struct type",
+			args: args{
+				v: struct {
+					Name    string `json:"name" description:"user name"`
+					Age     int    `json:"age,omitempty"`
+					Address struct {
+						City   string `json:"city"`
+						Street string `json:"street,omitempty"`
+					} `json:"address"`
+				}{},
+			},
+			want: &InputSchema{
+				Type: Object,
+				Properties: map[string]*Property{
+					"name": {
+						Type:        String,
+						Description: "user name",
+					},
+					"age": {
+						Type: Integer,
+					},
+					"address": {
+						Type: ObjectT,
+						Properties: map[string]*Property{
+							"city": {
+								Type: String,
+							},
+							"street": {
+								Type: String,
+							},
+						},
+						Required: []string{"city"},
+					},
+				},
+				Required: []string{"name", "address"},
+			},
+		},
+		{
+			name: "pointer to anonymous struct type",
+			args: args{
+				v: &struct {
+					ID     int    `json:"id"`
+					Email  string `json:"email,omitempty"`
+					Active bool   `json:"active"`
+				}{},
+			},
+			want: &InputSchema{
+				Type: Object,
+				Properties: map[string]*Property{
+					"id": {
+						Type: Integer,
+					},
+					"email": {
+						Type: String,
+					},
+					"active": {
+						Type: Boolean,
+					},
+				},
+				Required: []string{"id", "active"},
+			},
+		},
+		{
+			name: "nested anonymous struct",
+			args: args{
+				v: struct {
+					User struct {
+						Name string `json:"name"`
+						Info struct {
+							Age    int  `json:"age,omitempty"`
+							Active bool `json:"active"`
+						} `json:"info"`
+					} `json:"user"`
+				}{},
+			},
+			want: &InputSchema{
+				Type: Object,
+				Properties: map[string]*Property{
+					"user": {
+						Type: ObjectT,
+						Properties: map[string]*Property{
+							"name": {
+								Type: String,
+							},
+							"info": {
+								Type: ObjectT,
+								Properties: map[string]*Property{
+									"age": {
+										Type: Integer,
+									},
+									"active": {
+										Type: Boolean,
+									},
+								},
+								Required: []string{"active"},
+							},
+						},
+						Required: []string{"name", "info"},
+					},
+				},
+				Required: []string{"user"},
+			},
+		},
+		{
+			name: "map struct",
+			args: args{
+				v: struct {
+					User struct {
+						Name string            `json:"name"`
+						Info map[string]string `json:"info"`
+					} `json:"user"`
+				}{},
+			},
+			want: &InputSchema{
+				Type: Object,
+				Properties: map[string]*Property{
+					"user": {
+						Type: ObjectT,
+						Properties: map[string]*Property{
+							"name": {
+								Type: String,
+							},
+							"info": {
+								Type: ObjectT,
+							},
+						},
+						Required: []string{"name", "info"},
+					},
+				},
+				Required: []string{"user"},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -160,9 +293,122 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 				t.Errorf("GenerateSchemaFromReqStruct() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if !compareInputSchema(got, tt.want) {
 				t.Errorf("GenerateSchemaFromReqStruct() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
+}
+
+// compareInputSchema Compare the contents of two InputSchema structures instead of comparing pointer addresses
+func compareInputSchema(a, b *InputSchema) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	if a.Type != b.Type {
+		return false
+	}
+
+	// compare required field
+	if len(a.Required) != len(b.Required) {
+		return false
+	}
+	aRequiredCopy := make([]string, len(a.Required))
+	bRequiredCopy := make([]string, len(b.Required))
+	copy(aRequiredCopy, a.Required)
+	copy(bRequiredCopy, b.Required)
+	sort.Strings(aRequiredCopy)
+	sort.Strings(bRequiredCopy)
+	for i := range aRequiredCopy {
+		if aRequiredCopy[i] != bRequiredCopy[i] {
+			return false
+		}
+	}
+
+	// 比较Properties字段
+	if len(a.Properties) != len(b.Properties) {
+		return false
+	}
+	for k, aProp := range a.Properties {
+		bProp, ok := b.Properties[k]
+		if !ok {
+			return false
+		}
+		if !compareProperty(aProp, bProp) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// compareProperty Compare the contents of two Property structures
+func compareProperty(a, b *Property) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	if a.Type != b.Type {
+		return false
+	}
+	if a.Description != b.Description {
+		return false
+	}
+
+	// compare Items field
+	if !compareProperty(a.Items, b.Items) {
+		return false
+	}
+	// compare Properties field
+	if len(a.Properties) != len(b.Properties) {
+		return false
+	}
+	for k, aProp := range a.Properties {
+		bProp, ok := b.Properties[k]
+		if !ok {
+			return false
+		}
+		if !compareProperty(aProp, bProp) {
+			return false
+		}
+	}
+
+	// compare Required field比
+	if len(a.Required) != len(b.Required) {
+		return false
+	}
+	aRequiredCopy := make([]string, len(a.Required))
+	bRequiredCopy := make([]string, len(b.Required))
+	copy(aRequiredCopy, a.Required)
+	copy(bRequiredCopy, b.Required)
+	sort.Strings(aRequiredCopy)
+	sort.Strings(bRequiredCopy)
+	for i := range aRequiredCopy {
+		if aRequiredCopy[i] != bRequiredCopy[i] {
+			return false
+		}
+	}
+
+	// 比较Enum字段
+	if len(a.Enum) != len(b.Enum) {
+		return false
+	}
+	aEnumCopy := make([]string, len(a.Enum))
+	bEnumCopy := make([]string, len(b.Enum))
+	copy(aEnumCopy, a.Enum)
+	copy(bEnumCopy, b.Enum)
+	sort.Strings(aEnumCopy)
+	sort.Strings(bEnumCopy)
+	for i := range aEnumCopy {
+		if aEnumCopy[i] != bEnumCopy[i] {
+			return false
+		}
+	}
+
+	return true
 }

@@ -23,7 +23,34 @@ func (server *Server) Ping(ctx context.Context, request *protocol.PingRequest) (
 	}
 
 	var result protocol.PingResult
-	if err := pkg.JSONUnmarshal(response, &result); err != nil {
+	if err = pkg.JSONUnmarshal(response, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+	return &result, nil
+}
+
+func (server *Server) Sampling(ctx context.Context, request *protocol.CreateMessageRequest) (*protocol.CreateMessageResult, error) {
+	sessionID, err := getSessionIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	s, ok := server.sessionManager.GetSession(sessionID)
+	if !ok {
+		return nil, pkg.ErrLackSession
+	}
+
+	if s.GetClientCapabilities() == nil || s.GetClientCapabilities().Sampling == nil {
+		return nil, pkg.ErrServerNotSupport
+	}
+
+	response, err := server.callClient(ctx, sessionID, protocol.SamplingCreateMessage, request)
+	if err != nil {
+		return nil, err
+	}
+
+	var result protocol.CreateMessageResult
+	if err = pkg.JSONUnmarshal(response, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 	return &result, nil
@@ -98,7 +125,7 @@ func (server *Server) SendNotification4ResourcesUpdated(ctx context.Context, not
 func (server *Server) callClient(ctx context.Context, sessionID string, method protocol.Method, params protocol.ServerRequest) (json.RawMessage, error) {
 	session, ok := server.sessionManager.GetSession(sessionID)
 	if !ok {
-		return nil, pkg.ErrLackSession
+		return nil, fmt.Errorf("callClient: %w", pkg.ErrLackSession)
 	}
 
 	requestID := strconv.FormatInt(session.IncRequestID(), 10)
@@ -107,7 +134,7 @@ func (server *Server) callClient(ctx context.Context, sessionID string, method p
 	defer session.GetReqID2respChan().Remove(requestID)
 
 	if err := server.sendMsgWithRequest(ctx, sessionID, requestID, method, params); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("callClient: %w", err)
 	}
 
 	select {

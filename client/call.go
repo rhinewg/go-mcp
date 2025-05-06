@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"sync/atomic"
@@ -19,15 +20,15 @@ func (client *Client) initialization(ctx context.Context, request *protocol.Init
 		return nil, err
 	}
 	var result protocol.InitializeResult
-	if err := pkg.JSONUnmarshal(response, &result); err != nil {
+	if err = pkg.JSONUnmarshal(response, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	if result.ProtocolVersion != request.ProtocolVersion {
-		return nil, fmt.Errorf("protocol version mismatch, expected %s, got %s", request.ProtocolVersion, result.ProtocolVersion)
+	if _, ok := protocol.SupportedVersion[result.ProtocolVersion]; !ok {
+		return nil, fmt.Errorf("protocol version not supported, supported lastest version is %v", protocol.Version)
 	}
 
-	if err := client.sendNotification4Initialized(ctx); nil != err {
+	if err = client.sendNotification4Initialized(ctx); err != nil {
 		return nil, fmt.Errorf("failed to send InitializedNotification: %w", err)
 	}
 
@@ -220,7 +221,7 @@ func (client *Client) sendNotification4Initialized(ctx context.Context) error {
 // Responsible for request and response assembly
 func (client *Client) callServer(ctx context.Context, method protocol.Method, params protocol.ClientRequest) (json.RawMessage, error) {
 	if !client.ready.Load() && (method != protocol.Initialize && method != protocol.Ping) {
-		return nil, fmt.Errorf("client not ready")
+		return nil, errors.New("callServer: client not ready")
 	}
 
 	requestID := strconv.FormatInt(atomic.AddInt64(&client.requestID, 1), 10)

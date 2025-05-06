@@ -93,7 +93,7 @@ func main() {
 	}
 }
 
-func currentTime(request *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+func currentTime(_ context.Context, request *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
 	req := new(currentTimeReq)
 	if err := protocol.VerifyAndUnmarshal(request.RawArguments, &req); err != nil {
 		return nil, err
@@ -107,7 +107,7 @@ func currentTime(request *protocol.CallToolRequest) (*protocol.CallToolResult, e
 
 	return &protocol.CallToolResult{
 		Content: []protocol.Content{
-			protocol.TextContent{
+			&protocol.TextContent{
 				Type: "text",
 				Text: text,
 			},

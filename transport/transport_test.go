@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
 
@@ -17,8 +19,19 @@ func newMockSessionManager() *mockSessionManager {
 	return &mockSessionManager{}
 }
 
-func (m *mockSessionManager) CreateSession(sessionID string) {
+func (m *mockSessionManager) CreateSession() string {
+	sessionID := uuid.NewString()
+	m.Store(sessionID, nil)
+	return sessionID
+}
+
+func (m *mockSessionManager) OpenMessageQueueForSend(sessionID string) error {
+	_, ok := m.Load(sessionID)
+	if !ok {
+		return pkg.ErrLackSession
+	}
 	m.Store(sessionID, make(chan []byte))
+	return nil
 }
 
 func (m *mockSessionManager) IsExistSession(sessionID string) bool {
@@ -26,7 +39,7 @@ func (m *mockSessionManager) IsExistSession(sessionID string) bool {
 	return has
 }
 
-func (m *mockSessionManager) SendMessage(ctx context.Context, sessionID string, message []byte) error {
+func (m *mockSessionManager) EnqueueMessageForSend(ctx context.Context, sessionID string, message []byte) error {
 	ch, has := m.Load(sessionID)
 	if !has {
 		return pkg.ErrLackSession
@@ -40,7 +53,7 @@ func (m *mockSessionManager) SendMessage(ctx context.Context, sessionID string, 
 	}
 }
 
-func (m *mockSessionManager) GetMessageForSend(ctx context.Context, sessionID string) ([]byte, error) {
+func (m *mockSessionManager) DequeueMessageForSend(ctx context.Context, sessionID string) ([]byte, error) {
 	ch, has := m.Load(sessionID)
 	if !has {
 		return nil, pkg.ErrLackSession
@@ -75,15 +88,18 @@ func (m *mockSessionManager) CloseAllSessions() {
 }
 
 func testTransport(t *testing.T, client ClientTransport, server ServerTransport) {
-	msgWithServer := "hello"
+	testMsg := "hello server"
 	expectedMsgWithServerCh := make(chan string, 1)
-	server.SetReceiver(ServerReceiverF(func(_ context.Context, _ string, msg []byte) error {
+	server.SetReceiver(ServerReceiverF(func(_ context.Context, _ string, msg []byte) (<-chan []byte, error) {
 		expectedMsgWithServerCh <- string(msg)
-		return nil
+		msgCh := make(chan []byte, 1)
+		go func() {
+			msgCh <- msg
+		}()
+		return msgCh, nil
 	}))
 	server.SetSessionManager(newMockSessionManager())
 
-	msgWithClient := "hello"
 	expectedMsgWithClientCh := make(chan string, 1)
 	client.SetReceiver(ClientReceiverF(func(_ context.Context, msg []byte) error {
 		expectedMsgWithClientCh <- string(msg)
@@ -129,25 +145,15 @@ func testTransport(t *testing.T, client ClientTransport, server ServerTransport)
 		}
 	}()
 
-	if err := client.Send(context.Background(), Message(msgWithServer)); err != nil {
+	if err := client.Send(context.Background(), Message(testMsg)); err != nil {
 		t.Fatalf("client.Send() failed: %v", err)
 	}
 	expectedMsg := <-expectedMsgWithServerCh
-	if !reflect.DeepEqual(expectedMsg, msgWithServer) {
-		t.Fatalf("client.Send() got %v, want %v", expectedMsg, msgWithServer)
+	if !reflect.DeepEqual(expectedMsg, testMsg) {
+		t.Fatalf("client.Send() got %v, want %v", expectedMsg, testMsg)
 	}
-
-	sessionID := ""
-	if cli, ok := client.(*sseClientTransport); ok {
-		sessionID = cli.messageEndpoint.Query().Get("sessionID")
-	}
-
-	if err := server.Send(context.Background(), sessionID, Message(msgWithClient)); err != nil {
-		t.Fatalf("server.Send() failed: %v", err)
-	}
-
 	expectedMsg = <-expectedMsgWithClientCh
-	if !reflect.DeepEqual(expectedMsg, msgWithClient) {
-		t.Fatalf("server.Send() failed: got %v, want %v", expectedMsg, msgWithClient)
+	if !reflect.DeepEqual(expectedMsg, testMsg) {
+		t.Fatalf("server.Send() failed: got %v, want %v", expectedMsg, testMsg)
 	}
 }

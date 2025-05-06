@@ -12,8 +12,6 @@ import (
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
 
-const stdioSessionID = "stdio"
-
 type StdioServerTransportOption func(*stdioServerTransport)
 
 func WithStdioServerOptionLogger(log pkg.Logger) StdioServerTransportOption {
@@ -28,6 +26,7 @@ type stdioServerTransport struct {
 	writer   io.Writer
 
 	sessionManager sessionManager
+	sessionID      string
 
 	logger pkg.Logger
 
@@ -54,9 +53,9 @@ func (t *stdioServerTransport) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.cancel = cancel
 
-	t.sessionManager.CreateSession(stdioSessionID)
+	t.sessionID = t.sessionManager.CreateSession()
 
-	t.receive(ctx)
+	t.startReceive(ctx)
 
 	close(t.receiveShutDone)
 	return nil
@@ -94,31 +93,50 @@ func (t *stdioServerTransport) Shutdown(userCtx context.Context, serverCtx conte
 	}
 }
 
-func (t *stdioServerTransport) receive(ctx context.Context) {
-	s := bufio.NewScanner(t.reader)
+func (t *stdioServerTransport) startReceive(ctx context.Context) {
+	s := bufio.NewReader(t.reader)
 
-	for s.Scan() {
+	for {
+		line, err := s.ReadBytes('\n')
+		if err != nil {
+			if errors.Is(err, io.ErrClosedPipe) || // This error occurs during unit tests, suppressing it here
+				errors.Is(err, io.EOF) {
+				return
+			}
+			t.logger.Errorf("client receive unexpected error reading input: %v", err)
+		}
+		line = bytes.TrimRight(line, "\n")
+
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			// filter empty messages
-			// filter space messages and \t messages
-			if len(bytes.TrimFunc(s.Bytes(), func(r rune) bool { return r == ' ' || r == '\t' })) == 0 {
-				t.logger.Debugf("skipping empty message")
-				continue
-			}
-			if err := t.receiver.Receive(ctx, stdioSessionID, s.Bytes()); err != nil {
-				t.logger.Errorf("receiver failed: %v", err)
-				continue
-			}
+			t.receive(ctx, line)
 		}
 	}
+}
 
-	if err := s.Err(); err != nil {
-		if !errors.Is(err, io.ErrClosedPipe) { // This error occurs during unit tests, suppressing it here
-			t.logger.Errorf("server server unexpected error reading input: %v", err)
-		}
+func (t *stdioServerTransport) receive(ctx context.Context, line []byte) {
+	outputMsgCh, err := t.receiver.Receive(ctx, t.sessionID, line)
+	if err != nil {
+		t.logger.Errorf("receiver failed: %v", err)
 		return
 	}
+
+	if outputMsgCh == nil {
+		return
+	}
+
+	go func() {
+		defer pkg.Recover()
+
+		msg := <-outputMsgCh
+		if len(msg) == 0 {
+			t.logger.Errorf("handle request fail")
+			return
+		}
+		if err := t.Send(context.Background(), t.sessionID, msg); err != nil {
+			t.logger.Errorf("Failed to send message: %v", err)
+		}
+	}()
 }

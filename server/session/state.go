@@ -13,6 +13,8 @@ import (
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 )
 
+var ErrQueueNotOpened = errors.New("queue has not been opened")
+
 type State struct {
 	lastActiveAt time.Time
 
@@ -38,7 +40,6 @@ type State struct {
 func NewState() *State {
 	return &State{
 		lastActiveAt:        time.Now(),
-		sendChan:            make(chan []byte, 64),
 		reqID2respChan:      cmap.New[chan *protocol.JSONRPCResponse](),
 		subscribedResources: cmap.New[struct{}](),
 		receivedInitRequest: pkg.NewAtomicBool(),
@@ -50,6 +51,10 @@ func NewState() *State {
 func (s *State) SetClientInfo(ClientInfo *protocol.Implementation, ClientCapabilities *protocol.ClientCapabilities) {
 	s.clientInfo = ClientInfo
 	s.clientCapabilities = ClientCapabilities
+}
+
+func (s *State) GetClientCapabilities() *protocol.ClientCapabilities {
+	return s.clientCapabilities
 }
 
 func (s *State) SetReceivedInitRequest() {
@@ -85,19 +90,35 @@ func (s *State) Close() {
 	defer s.mu.Unlock()
 
 	s.closed.Store(true)
-	close(s.sendChan)
+
+	if s.sendChan != nil {
+		close(s.sendChan)
+	}
 }
 
 func (s *State) updateLastActiveAt() {
 	s.lastActiveAt = time.Now()
 }
 
-func (s *State) sendMessage(ctx context.Context, message []byte) error {
+func (s *State) openMessageQueueForSend() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.sendChan == nil {
+		s.sendChan = make(chan []byte, 64)
+	}
+}
+
+func (s *State) enqueueMessage(ctx context.Context, message []byte) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	if s.closed.Load() {
 		return errors.New("session already closed")
+	}
+
+	if s.sendChan == nil {
+		return ErrQueueNotOpened
 	}
 
 	select {
@@ -108,7 +129,14 @@ func (s *State) sendMessage(ctx context.Context, message []byte) error {
 	}
 }
 
-func (s *State) getMessageForSend(ctx context.Context) ([]byte, error) {
+func (s *State) dequeueMessage(ctx context.Context) ([]byte, error) {
+	s.mu.RLock()
+	if s.sendChan == nil {
+		s.mu.RUnlock()
+		return nil, ErrQueueNotOpened
+	}
+	s.mu.RUnlock()
+
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()

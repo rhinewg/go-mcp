@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 )
 
@@ -159,6 +160,62 @@ func Test_Validate(t *testing.T) {
 			},
 			Required: []string{"string"},
 		}}, false},
+		{"nested anonymous struct", args{data: map[string]any{
+			"user": map[string]any{
+				"name": "test",
+				"info": map[string]any{
+					"age":    30,
+					"active": true,
+				},
+			},
+		}, schema: Property{
+			Type: ObjectT, Properties: map[string]*Property{
+				"user": {
+					Type: ObjectT,
+					Properties: map[string]*Property{
+						"name": {Type: String},
+						"info": {
+							Type: ObjectT,
+							Properties: map[string]*Property{
+								"age":    {Type: Integer},
+								"active": {Type: Boolean},
+							},
+							Required: []string{"active"},
+						},
+					},
+					Required: []string{"name", "info"},
+				},
+			},
+			Required: []string{"user"},
+		}}, true},
+		{"nested anonymous struct with invalid data", args{data: map[string]any{
+			"user": map[string]any{
+				"name": "test",
+				"info": map[string]any{
+					"age":    "not_a_number",
+					"active": true,
+				},
+			},
+		}, schema: Property{
+			Type: ObjectT, Properties: map[string]*Property{
+				"user": {
+					Type: ObjectT,
+					Properties: map[string]*Property{
+						"name": {Type: String},
+						"info": {
+							Type: ObjectT,
+							Properties: map[string]*Property{
+								"age":    {Type: Integer},
+								"active": {Type: Boolean},
+							},
+							Required: []string{"active"},
+						},
+					},
+					Required: []string{"name", "info"},
+				},
+			},
+			Required: []string{"user"},
+		}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -256,11 +313,27 @@ func TestVerifyAndUnmarshal(t *testing.T) {
 		Number  float64 `json:"number,omitempty"` // optional
 		Integer int     `json:"-"`                // ignore
 
-		String4Enum  string  `json:"string4enum,omitempty" enum:"a,b,c"`       // enum
-		Integer4Enum int     `json:"integer4enum,omitempty" enum:"1,2,3"`      // enum
-		Number4Enum  float64 `json:"number4enum,omitempty" enum:"1.1,2.2,3.3"` // enum
-		Number4Enum2 int     `json:"number4enum2,omitempty" enum:"1,2,3"`      // enum
+		String4Enum  string         `json:"string4enum,omitempty" enum:"a,b,c"`       // enum
+		Integer4Enum int            `json:"integer4enum,omitempty" enum:"1,2,3"`      // enum
+		Number4Enum  float64        `json:"number4enum,omitempty" enum:"1.1,2.2,3.3"` // enum
+		Number4Enum2 int            `json:"number4enum2,omitempty" enum:"1,2,3"`      // enum
+		MM           map[string]any `json:"mm,omitempty"`
 	}
+
+	// Generate schema for anonymous struct first
+	anonymousStructSchema, _ := generateSchemaFromReqStruct(struct {
+		Name   string `json:"name"`
+		Age    int    `json:"age,omitempty"`
+		Active bool   `json:"active"`
+	}{})
+
+	// Save the schema in cache for test
+	schemaCache.Store(getTypeUUID(reflect.TypeOf(struct {
+		Name   string `json:"name"`
+		Age    int    `json:"age,omitempty"`
+		Active bool   `json:"active"`
+	}{})), anonymousStructSchema)
+
 	type args struct {
 		content json.RawMessage
 		v       any
@@ -341,6 +414,41 @@ func TestVerifyAndUnmarshal(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{"validate integer failed", args{
+			content: []byte(`{"string":"abc","integer":123.4}`),
+			v: &struct {
+				String  string `json:"string"`
+				Integer int    `json:"integer"`
+			}{},
+		}, true},
+		{"validate anonymous struct", args{
+			content: []byte(`{"name":"test","active":true}`),
+			v: &struct {
+				Name   string `json:"name"`
+				Age    int    `json:"age,omitempty"`
+				Active bool   `json:"active"`
+			}{},
+		}, false},
+		{"validate anonymous struct with invalid data", args{
+			content: []byte(`{"active":"not_a_bool"}`),
+			v: &struct {
+				Name   string `json:"name"`
+				Age    int    `json:"age,omitempty"`
+				Active bool   `json:"active"`
+			}{},
+		}, true},
+		{"validate anonymous struct missing required field", args{
+			content: []byte(`{"age":30,"active":true}`),
+			v: &struct {
+				Name   string `json:"name"`
+				Age    int    `json:"age,omitempty"`
+				Active bool   `json:"active"`
+			}{},
+		}, true},
+		{"validate map struct", args{
+			content: []byte(`{"string":"str","mm":{"a":1}}`),
+			v:       &testData{},
+		}, false},
 	}
 	_, err := generateSchemaFromReqStruct(testData{})
 	if err != nil {

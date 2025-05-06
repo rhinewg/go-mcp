@@ -85,7 +85,7 @@ func (t *sseClientTransport) Start() error {
 	go func() {
 		defer pkg.Recover()
 
-		req, err := http.NewRequest(http.MethodGet, t.serverURL.String(), nil)
+		req, err := http.NewRequestWithContext(t.ctx, http.MethodGet, t.serverURL.String(), nil)
 		if err != nil {
 			errChan <- fmt.Errorf("failed to create request: %w", err)
 			return
@@ -106,17 +106,6 @@ func (t *sseClientTransport) Start() error {
 			errChan <- fmt.Errorf("unexpected status code: %d, status: %s", resp.StatusCode, resp.Status)
 			return
 		}
-
-		go func() {
-			defer pkg.Recover()
-
-			<-t.ctx.Done()
-
-			if err := resp.Body.Close(); err != nil {
-				t.logger.Errorf("failed to close SSE stream body: %w", err)
-				return
-			}
-		}()
 
 		t.readSSE(resp.Body)
 

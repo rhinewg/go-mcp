@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	cmap "github.com/orcaman/concurrent-map/v2"
@@ -17,6 +18,12 @@ type Option func(*Client)
 func WithNotifyHandler(handler NotifyHandler) Option {
 	return func(s *Client) {
 		s.notifyHandler = handler
+	}
+}
+
+func WithSamplingHandler(handler SamplingHandler) Option {
+	return func(s *Client) {
+		s.samplingHandler = handler
 	}
 }
 
@@ -43,11 +50,14 @@ type Client struct {
 
 	reqID2respChan cmap.ConcurrentMap[string, chan *protocol.JSONRPCResponse]
 
+	samplingHandler SamplingHandler
+
 	notifyHandler NotifyHandler
 
 	requestID int64
 
-	ready *pkg.AtomicBool
+	ready            *pkg.AtomicBool
+	initializationMu sync.Mutex
 
 	clientInfo         *protocol.Implementation
 	clientCapabilities *protocol.ClientCapabilities
@@ -84,6 +94,10 @@ func NewClient(t transport.ClientTransport, opts ...Option) (*Client, error) {
 		h := NewBaseNotifyHandler()
 		h.Logger = client.logger
 		client.notifyHandler = h
+	}
+
+	if client.samplingHandler != nil {
+		client.clientCapabilities.Sampling = struct{}{}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), client.initTimeout)

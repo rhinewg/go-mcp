@@ -12,8 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
 
@@ -150,6 +148,7 @@ func NewSSEServerTransport(addr string, opts ...SSEServerTransportOption) (Serve
 func NewSSEServerTransportAndHandler(messageEndpointURL string,
 	opts ...SSEServerTransportAndHandlerOption,
 ) (ServerTransport, *SSEHandler, error) { //nolint:whitespace
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	t := &sseServerTransport{
@@ -171,6 +170,8 @@ func (t *sseServerTransport) Run() error {
 		return nil
 	}
 
+	fmt.Printf("starting mcp server at http://%s%s\n", t.httpSvr.Addr, t.ssePath)
+
 	if err := t.httpSvr.ListenAndServe(); err != nil {
 		return fmt.Errorf("failed to start HTTP server: %w", err)
 	}
@@ -183,11 +184,10 @@ func (t *sseServerTransport) Send(ctx context.Context, sessionID string, msg Mes
 
 	select {
 	case <-t.ctx.Done():
-		return ctx.Err()
+		return t.ctx.Err()
 	default:
+		return t.sessionManager.EnqueueMessageForSend(ctx, sessionID, msg)
 	}
-
-	return t.sessionManager.SendMessage(ctx, sessionID, msg)
 }
 
 func (t *sseServerTransport) SetReceiver(receiver serverReceiver) {
@@ -200,10 +200,10 @@ func (t *sseServerTransport) SetSessionManager(manager sessionManager) {
 
 // handleSSE handles incoming SSE connections from clients and sends messages to them.
 func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
-	defer pkg.Recover()
+	defer pkg.RecoverWithFunc(func(_ any) {
+		t.writeError(w, http.StatusInternalServerError, "Internal server error")
+	})
 
-	//nolint:govet // Ignore error since we're just logging
-	requestCtx := r.Context()
 	// Set headers for SSE
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -212,14 +212,13 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 	// Create flush-supporting writer
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		t.writeError(w, http.StatusInternalServerError, "Streaming not supported")
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 
 	// Create an SSE connection
-	sessionID := uuid.New().String()
-	t.sessionManager.CreateSession(sessionID)
+	sessionID := t.sessionManager.CreateSession()
 	defer t.sessionManager.CloseSession(sessionID)
 
 	uri := fmt.Sprintf("%s?sessionID=%s", t.messageEndpointURL, sessionID)
@@ -230,12 +229,18 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 	}
 	flusher.Flush()
 
+	if err := t.sessionManager.OpenMessageQueueForSend(sessionID); err != nil {
+		t.logger.Errorf("handleSSE sessionID=%s OpenMessageQueueForSend fail: %v", sessionID, err)
+		return
+	}
+
 	for {
-		msg, err := t.sessionManager.GetMessageForSend(requestCtx, sessionID)
+		msg, err := t.sessionManager.DequeueMessageForSend(r.Context(), sessionID)
 		if err != nil {
-			if !errors.Is(err, pkg.ErrSendEOF) {
-				t.logger.Debugf("sse connect request err: %+v, sessionID=%s", err.Error(), sessionID)
+			if errors.Is(err, pkg.ErrSendEOF) {
+				return
 			}
+			t.logger.Debugf("sse connect dequeueMessage err: %+v, sessionID=%s", err.Error(), sessionID)
 			return
 		}
 
@@ -267,29 +272,45 @@ func (t *sseServerTransport) handleMessage(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ctx := r.Context()
 	// Parse message as raw JSON
-	bs, err := io.ReadAll(r.Body)
+	inputMsg, err := io.ReadAll(r.Body)
 	if err != nil {
 		t.writeError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request: %v", err))
 		return
 	}
-	if err = t.receiver.Receive(ctx, sessionID, bs); err != nil {
+
+	ctx := pkg.NewCancelShieldContext(r.Context())
+	outputMsgCh, err := t.receiver.Receive(ctx, sessionID, inputMsg)
+	if err != nil {
 		t.writeError(w, http.StatusBadRequest, fmt.Sprintf("Failed to receive: %v", err))
 		return
 	}
-	// Process message through MCPServer
 
-	// For notifications, just send 202 Accepted with no body
-	t.logger.Debugf("Received message: %s", string(bs))
-	// ref: https://github.com/encode/httpx/blob/master/httpx/_status_codes.py#L8
-	// in official httpx, 2xx is success
+	t.logger.Debugf("Received message: %s", string(inputMsg))
 	w.WriteHeader(http.StatusAccepted)
+
+	if outputMsgCh == nil {
+		return
+	}
+
+	go func() {
+		defer pkg.Recover()
+
+		msg := <-outputMsgCh
+		if len(msg) == 0 {
+			t.logger.Errorf("handle request fail")
+			return
+		}
+		if err := t.Send(context.Background(), sessionID, msg); err != nil {
+			t.logger.Errorf("Failed to send message: %v", err)
+		}
+	}()
 }
 
 // writeError writes a JSON-RPC error response with the given error details.
 func (t *sseServerTransport) writeError(w http.ResponseWriter, code int, message string) {
-	t.logger.Errorf("sseServerTransport writeError: code: %d, message: %s", code, message)
+	t.logger.Errorf("sseServerTransport Error: code: %d, message: %s", code, message)
+
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(code)
 	if _, err := w.Write([]byte(message)); err != nil {

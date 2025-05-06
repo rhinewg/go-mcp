@@ -6,6 +6,7 @@ import (
 )
 
 var (
+	ErrClientNotSupport          = errors.New("this feature client not support")
 	ErrServerNotSupport          = errors.New("this feature server not support")
 	ErrRequestInvalid            = errors.New("request invalid")
 	ErrLackResponseChan          = errors.New("lack response chan")
@@ -14,6 +15,7 @@ var (
 	ErrJSONUnmarshal             = errors.New("json unmarshal error")
 	ErrSessionHasNotInitialized  = errors.New("the session has not been initialized")
 	ErrLackSession               = errors.New("lack session")
+	ErrSessionClosed             = errors.New("session closed")
 	ErrSendEOF                   = errors.New("send EOF")
 )
 
