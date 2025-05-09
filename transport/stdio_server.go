@@ -70,13 +70,6 @@ func (t *stdioServerTransport) Send(_ context.Context, _ string, msg Message) er
 	return nil
 }
 
-func (t *stdioServerTransport) Senderr(_ context.Context, _ string, msg Message) error {
-	if _, err := t.writerror.Write(append(msg, mcpMessageDelimiter)); err != nil {
-		return fmt.Errorf("server failed to write: %w", err)
-	}
-	return nil
-}
-
 func (t *stdioServerTransport) SetReceiver(receiver serverReceiver) {
 	t.receiver = receiver
 }
