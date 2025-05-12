@@ -152,6 +152,8 @@ func (t *streamableHTTPServerTransport) Run() error {
 		return nil
 	}
 
+	fmt.Printf("starting mcp server at http://%s%s\n", t.httpSvr.Addr, t.mcpEndpoint)
+
 	if err := t.httpSvr.ListenAndServe(); err != nil {
 		return fmt.Errorf("failed to start HTTP server: %w", err)
 	}

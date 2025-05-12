@@ -90,6 +90,7 @@ func main() {
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
@@ -130,7 +131,7 @@ func main() {
 	}
 }
 
-func handleTimeRequest(req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+func handleTimeRequest(ctx context.Context, req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
 	var timeReq TimeRequest
 	if err := protocol.VerifyAndUnmarshal(req.RawArguments, &timeReq); err != nil {
 		return nil, err
@@ -143,7 +144,7 @@ func handleTimeRequest(req *protocol.CallToolRequest) (*protocol.CallToolResult,
 
 	return &protocol.CallToolResult{
 		Content: []protocol.Content{
-			protocol.TextContent{
+			&protocol.TextContent{
 				Type: "text",
 				Text: time.Now().In(loc).String(),
 			},
@@ -218,6 +219,7 @@ Currently supported transport methods:
 ![Transport Methods](docs/images/img_1.png)
 
 - **HTTP SSE/POST**: HTTP-based server push and client requests, suitable for web scenarios
+- **Streamable HTTP**: Supports HTTP POST/GET requests with both stateless and stateful modes, where stateful mode utilizes SSE for multi-message streaming to enable server-to-client notifications and requests
 - **Stdio**: Standard input/output stream-based, suitable for local inter-process communication
 
 The transport layer uses a unified interface abstraction, making it simple to add new transport methods (like Streamable HTTP, WebSocket, gRPC) without affecting upper-layer code.
