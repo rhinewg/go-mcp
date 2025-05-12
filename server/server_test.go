@@ -594,7 +594,6 @@ func testServerRateLimiter(t *testing.T, tt testLimiter) {
 			Name:    "ExampleServer",
 			Version: "1.0.0",
 		}),
-		WithRateLimiter(components.NewTokenBucketLimiter(tt.rate)),
 	)
 	if err != nil {
 		t.Fatalf("NewServer: %+v", err)
@@ -612,12 +611,12 @@ func testServerRateLimiter(t *testing.T, tt testLimiter) {
 	}
 
 	// Add minimal processing delay to simulate real-world scenario
-	server.RegisterTool(testTool, func(_ *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+	server.RegisterTool(testTool, func(_ context.Context, _ *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
 		time.Sleep(5 * time.Millisecond) // Small processing delay
 		return &protocol.CallToolResult{
-			Content: []protocol.Content{testToolCallContent},
+			Content: []protocol.Content{&testToolCallContent},
 		}, nil
-	})
+	}, RateLimitMiddleware(components.NewTokenBucketLimiter(tt.rate)))
 
 	// Start server
 	serverErrCh := make(chan error, 1)

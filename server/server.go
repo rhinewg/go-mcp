@@ -45,22 +45,20 @@ func WithLogger(logger pkg.Logger) Option {
 	}
 }
 
-// WithRateLimiter 添加一个创建带速率限制的服务器的选项
-func WithRateLimiter(limiter components.RateLimiter) Option {
-	return func(s *Server) {
-		s.limiter = limiter
-	}
-}
+// ToolMiddleware 定义工具 handler 的中间件类型
+// 允许像链式调用一样包裹 ToolHandlerFunc
+type ToolMiddleware func(ToolHandlerFunc) ToolHandlerFunc
 
-// WithDefaultRateLimiter 添加一个便捷函数用默认参数创建限速器
-func WithDefaultRateLimiter() Option {
-	const defaultLimit = 5.0
-	const defaultBurst = 10
-	limiter := components.NewTokenBucketLimiter(components.Rate{
-		Limit: defaultLimit,
-		Burst: defaultBurst,
-	})
-	return WithRateLimiter(limiter)
+// RateLimitMiddleware 返回一个速率限制中间件
+func RateLimitMiddleware(limiter components.RateLimiter) ToolMiddleware {
+	return func(next ToolHandlerFunc) ToolHandlerFunc {
+		return func(ctx context.Context, req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+			if limiter != nil && !limiter.Allow(req.Name) {
+				return nil, pkg.ErrRateLimitExceeded
+			}
+			return next(ctx, req)
+		}
+	}
 }
 
 type Server struct {
@@ -72,7 +70,6 @@ type Server struct {
 	resourceTemplates pkg.SyncMap[*resourceTemplateEntry]
 
 	sessionManager *session.Manager
-	limiter        components.RateLimiter
 
 	inShutdown   *pkg.AtomicBool // true when server is in shutdown
 	inFlyRequest sync.WaitGroup
@@ -132,7 +129,12 @@ type toolEntry struct {
 
 type ToolHandlerFunc func(context.Context, *protocol.CallToolRequest) (*protocol.CallToolResult, error)
 
-func (server *Server) RegisterTool(tool *protocol.Tool, toolHandler ToolHandlerFunc) {
+// RegisterTool 支持 middleware
+func (server *Server) RegisterTool(tool *protocol.Tool, toolHandler ToolHandlerFunc, middlewares ...ToolMiddleware) {
+	// 依次包裹
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		toolHandler = middlewares[i](toolHandler)
+	}
 	server.tools.Store(tool.Name, &toolEntry{tool: tool, handler: toolHandler})
 	if !server.sessionManager.IsEmpty() {
 		if err := server.sendNotification4ToolListChanges(context.Background()); err != nil {
@@ -266,6 +268,3 @@ func (server *Server) sessionDetection(ctx context.Context, sessionID string) er
 	}
 	return nil
 }
-
-// GetLimiter 获取限速器
-func (server *Server) GetLimiter() components.RateLimiter { return server.limiter }

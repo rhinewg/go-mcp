@@ -28,31 +28,24 @@ func main() {
 			Name:    "current-time-v2-server",
 			Version: "1.0.0",
 		}),
-		// 创建一个每秒5个请求，突发容量为10的限速器
-		server.WithRateLimiter(components.NewTokenBucketLimiter(components.Rate{
-			Limit: 5.0, // 每秒5个请求
-			Burst: 10,  // 最多允许10个请求的突发
-		})),
 	)
 	if err != nil {
 		log.Fatalf("Failed to create server: %v", err)
 	}
 
 	// new protocol tool with name, descipriton and properties
-	tool, err := protocol.NewTool("current_time", "Get current time with timezone, Asia/Shanghai is default", currentTimeReq{},
-		// 为指定工具设置每秒10个请求，突发容量为20的限速器
-		protocol.WithRateLimit(srv.GetLimiter(), components.Rate{
-			Limit: 10.0, // 每秒10个请求
-			Burst: 20,   // 最多允许20个请求的突发
-		}),
-	)
+	tool, err := protocol.NewTool("current_time", "Get current time with timezone, Asia/Shanghai is default", currentTimeReq{})
 	if err != nil {
 		log.Fatalf("Failed to create tool: %v", err)
 		return
 	}
 
 	// register tool and start mcp server
-	srv.RegisterTool(tool, currentTime)
+	srv.RegisterTool(tool, currentTime,
+		server.RateLimitMiddleware(components.NewTokenBucketLimiter(components.Rate{
+			Limit: 10.0, // 每秒10个请求
+			Burst: 20,   // 最多允许20个请求的突发
+		})))
 	// srv.RegisterResource()
 	// srv.RegisterPrompt()
 	// srv.RegisterResourceTemplate()

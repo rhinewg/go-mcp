@@ -5,17 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
-	"github.com/ThinkInAIXYZ/go-mcp/server/components"
 )
-
-type Option func(*Tool)
-
-// WithRateLimit 设置工具的速率限制
-func WithRateLimit(rateLimit components.RateLimiter, rate components.Rate) Option {
-	return func(t *Tool) {
-		rateLimit.SetToolLimit(t.Name, rate)
-	}
-}
 
 // ListToolsRequest represents a request to list available tools
 type ListToolsRequest struct{}
@@ -187,23 +177,17 @@ type ToolListChangedNotification struct {
 }
 
 // NewTool create a tool
-func NewTool(name string, description string, inputReqStruct interface{}, opts ...Option) (*Tool, error) {
+func NewTool(name string, description string, inputReqStruct interface{}) (*Tool, error) {
 	schema, err := generateSchemaFromReqStruct(inputReqStruct)
 	if err != nil {
 		return nil, err
 	}
 
-	t := &Tool{
+	return &Tool{
 		Name:        name,
 		Description: description,
 		InputSchema: *schema,
-	}
-
-	for _, opt := range opts {
-		opt(t)
-	}
-
-	return t, nil
+	}, nil
 }
 
 func NewToolWithRawSchema(name, description string, schema json.RawMessage) *Tool {
