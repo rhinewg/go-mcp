@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 
 	"github.com/yosida95/uritemplate/v3"
 
@@ -68,9 +67,6 @@ func (server *Server) handleRequestWithListPrompts(rawParams json.RawMessage) (*
 		return true
 	})
 	if server.paginationLimit > 0 {
-		sort.Slice(prompts, func(i, j int) bool {
-			return prompts[i].Name < prompts[j].Name
-		})
 		resourcesToReturn, nextCursor, err := protocol.PaginationLimit[protocol.Prompt](prompts, request.Cursor, server.paginationLimit)
 		return &protocol.ListPromptsResult{
 			Prompts:    resourcesToReturn,
@@ -116,9 +112,6 @@ func (server *Server) handleRequestWithListResources(rawParams json.RawMessage) 
 		return true
 	})
 	if server.paginationLimit > 0 {
-		sort.Slice(resources, func(i, j int) bool {
-			return resources[i].Name < resources[j].Name
-		})
 		resourcesToReturn, nextCursor, err := protocol.PaginationLimit[protocol.Resource](resources, request.Cursor, server.paginationLimit)
 		return &protocol.ListResourcesResult{
 			Resources:  resourcesToReturn,
@@ -149,9 +142,6 @@ func (server *Server) handleRequestWithListResourceTemplates(rawParams json.RawM
 		return true
 	})
 	if server.paginationLimit > 0 {
-		sort.Slice(templates, func(i, j int) bool {
-			return templates[i].Name < templates[j].Name
-		})
 		resourcesToReturn, nextCursor, err := protocol.PaginationLimit[protocol.ResourceTemplate](templates, request.Cursor, server.paginationLimit)
 		return &protocol.ListResourceTemplatesResult{
 			ResourceTemplates: resourcesToReturn,
@@ -251,9 +241,6 @@ func (server *Server) handleRequestWithListTools(rawParams json.RawMessage) (*pr
 		return true
 	})
 	if server.paginationLimit > 0 {
-		sort.Slice(tools, func(i, j int) bool {
-			return tools[i].Name < tools[j].Name
-		})
 		resourcesToReturn, nextCursor, err := protocol.PaginationLimit[*protocol.Tool](tools, request.Cursor, server.paginationLimit)
 		return &protocol.ListToolsResult{
 			Tools:      resourcesToReturn,

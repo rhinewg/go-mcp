@@ -13,6 +13,9 @@ type Named interface {
 }
 
 func PaginationLimit[T Named](allElements []T, cursor Cursor, limit int) ([]T, Cursor, error) {
+	sort.Slice(allElements, func(i, j int) bool {
+		return allElements[i].GetName() < allElements[j].GetName()
+	})
 	startPos := 0
 	if cursor != "" {
 		c, err := base64.StdEncoding.DecodeString(string(cursor))
