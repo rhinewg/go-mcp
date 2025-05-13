@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 	"github.com/ThinkInAIXYZ/go-mcp/server"
-	"github.com/ThinkInAIXYZ/go-mcp/server/components"
 	"github.com/ThinkInAIXYZ/go-mcp/transport"
 )
 
@@ -42,7 +42,7 @@ func main() {
 
 	// register tool and start mcp server
 	srv.RegisterTool(tool, currentTime,
-		server.RateLimitMiddleware(components.NewTokenBucketLimiter(components.Rate{
+		server.RateLimitMiddleware(pkg.NewTokenBucketLimiter(pkg.Rate{
 			Limit: 10.0, // 每秒10个请求
 			Burst: 20,   // 最多允许20个请求的突发
 		})))

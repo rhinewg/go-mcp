@@ -8,7 +8,6 @@ import (
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
-	"github.com/ThinkInAIXYZ/go-mcp/server/components"
 	"github.com/ThinkInAIXYZ/go-mcp/server/session"
 	"github.com/ThinkInAIXYZ/go-mcp/transport"
 )
@@ -50,7 +49,7 @@ func WithLogger(logger pkg.Logger) Option {
 type ToolMiddleware func(ToolHandlerFunc) ToolHandlerFunc
 
 // RateLimitMiddleware 返回一个速率限制中间件
-func RateLimitMiddleware(limiter components.RateLimiter) ToolMiddleware {
+func RateLimitMiddleware(limiter pkg.RateLimiter) ToolMiddleware {
 	return func(next ToolHandlerFunc) ToolHandlerFunc {
 		return func(ctx context.Context, req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
 			if limiter != nil && !limiter.Allow(req.Name) {

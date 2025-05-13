@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 	"github.com/ThinkInAIXYZ/go-mcp/server"
 	"github.com/ThinkInAIXYZ/go-mcp/transport"
@@ -40,21 +41,28 @@ func main() {
 		log.Fatalf("Failed to create server: %v", err)
 	}
 
+	// 创建令牌桶限速器
+	limiter := pkg.NewTokenBucketLimiter(pkg.Rate{
+		Limit: 10.0, // 每秒10个请求
+		Burst: 20,   // 最多允许20个请求的突发
+	})
 	tool1, err := protocol.NewTool("current_time", "Get current time with timezone, Asia/Shanghai is default", currentTimeReq{})
 	if err != nil {
 		log.Fatalf("Failed to create tool: %v", err)
 		return
 	}
+	limiter.SetToolLimit(tool1.Name, pkg.Rate{Limit: 1.0, Burst: 1})
 
 	tool2, err := protocol.NewTool("delete_file", "delete file", deleteFileReq{})
 	if err != nil {
 		log.Fatalf("Failed to create tool: %v", err)
 		return
 	}
+	limiter.SetToolLimit(tool2.Name, pkg.Rate{Limit: 1.0, Burst: 1})
 
 	// register tool and start mcp server
-	srv.RegisterTool(tool1, currentTime)
-	srv.RegisterTool(tool2, deleteFile)
+	srv.RegisterTool(tool1, currentTime, server.RateLimitMiddleware(limiter))
+	srv.RegisterTool(tool2, deleteFile, server.RateLimitMiddleware(limiter))
 	// srv.RegisterResource()
 	// srv.RegisterPrompt()
 	// srv.RegisterResourceTemplate()

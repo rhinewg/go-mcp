@@ -13,7 +13,6 @@ import (
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
-	"github.com/ThinkInAIXYZ/go-mcp/server/components"
 	"github.com/ThinkInAIXYZ/go-mcp/transport"
 )
 
@@ -511,7 +510,7 @@ func testServerInit(t *testing.T, server *Server, in io.Writer, outScan *bufio.S
 
 type testLimiter struct {
 	name               string
-	rate               components.Rate
+	rate               pkg.Rate
 	numRequests        int
 	requestInterval    time.Duration // Interval between requests
 	expectedErrorCount int
@@ -522,7 +521,7 @@ func TestServerRateLimiters(t *testing.T) {
 	tests := []testLimiter{
 		{
 			name: "rapid_requests_exceed_burst",
-			rate: components.Rate{
+			rate: pkg.Rate{
 				Limit: 5.0,
 				Burst: 10,
 			},
@@ -533,7 +532,7 @@ func TestServerRateLimiters(t *testing.T) {
 		},
 		{
 			name: "slow_requests_under_limit",
-			rate: components.Rate{
+			rate: pkg.Rate{
 				Limit: 5.0,
 				Burst: 5,
 			},
@@ -544,7 +543,7 @@ func TestServerRateLimiters(t *testing.T) {
 		},
 		{
 			name: "mixed_rate_pattern",
-			rate: components.Rate{
+			rate: pkg.Rate{
 				Limit: 10.0,
 				Burst: 5,
 			},
@@ -616,7 +615,7 @@ func testServerRateLimiter(t *testing.T, tt testLimiter) {
 		return &protocol.CallToolResult{
 			Content: []protocol.Content{&testToolCallContent},
 		}, nil
-	}, RateLimitMiddleware(components.NewTokenBucketLimiter(tt.rate)))
+	}, RateLimitMiddleware(pkg.NewTokenBucketLimiter(tt.rate)))
 
 	// Start server
 	serverErrCh := make(chan error, 1)

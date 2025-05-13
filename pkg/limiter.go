@@ -1,4 +1,4 @@
-package components
+package pkg
 
 import (
 	"sync"
@@ -8,7 +8,6 @@ import (
 // RateLimiter 定义速率限制接口
 type RateLimiter interface {
 	Allow(toolName string) bool
-	SetToolLimit(toolName string, rate Rate)
 }
 
 // TokenBucketLimiter 令牌桶限速器实现
