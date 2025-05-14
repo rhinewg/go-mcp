@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
-
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
 
@@ -37,6 +35,12 @@ func WithSSEClientOptionLogger(log pkg.Logger) SSEClientTransportOption {
 	}
 }
 
+func WithRetryFunc(retry func(func() error)) SSEClientTransportOption {
+	return func(t *sseClientTransport) {
+		t.retry = retry
+	}
+}
+
 type sseClientTransport struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -51,6 +55,8 @@ type sseClientTransport struct {
 	logger         pkg.Logger
 	receiveTimeout time.Duration
 	client         *http.Client
+
+	retry func(func() error)
 
 	sseConnectClose chan struct{}
 }
@@ -70,6 +76,14 @@ func NewSSEClientTransport(serverURL string, opts ...SSEClientTransportOption) (
 		receiveTimeout:  time.Second * 30,
 		client:          http.DefaultClient,
 		sseConnectClose: make(chan struct{}),
+		retry: func(operation func() error) {
+			for {
+				if e := operation(); e == nil {
+					return
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+		},
 	}
 
 	for _, opt := range opts {
@@ -95,27 +109,23 @@ func (t *sseClientTransport) Start() (err error) {
 		defer pkg.Recover()
 		defer close(t.sseConnectClose)
 
-		operation := func() error {
-			return t.startSSE()
-		}
-
-		notify := func(err error, d time.Duration) {
-			t.logger.Errorf("startSSE: %+v, duration=%s", err, d)
-		}
-
-		if err := backoff.RetryNotify(operation, backoff.WithContext(backoff.NewExponentialBackOff(), t.ctx), notify); err != nil {
-			if !errors.Is(err, context.Canceled) {
-				t.logger.Errorf("backoff.Retry: %+v", err)
+		t.retry(func() error {
+			if e := t.startSSE(); e != nil {
+				if errors.Is(e, context.Canceled) {
+					return nil
+				}
+				t.logger.Errorf("startSSE: %+v", e)
+				return e
 			}
-			return
-		}
+			return nil
+		})
 	}()
 
 	// Wait for the endpoint to be received
 	select {
 	case <-t.endpointChan:
 	// Endpoint received, proceed
-	case err := <-errChan:
+	case err = <-errChan:
 		return fmt.Errorf("error in SSE stream: %w", err)
 	case <-time.After(10 * time.Second): // Add a timeout
 		return fmt.Errorf("timeout waiting for endpoint")
