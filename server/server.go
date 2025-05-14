@@ -46,6 +46,22 @@ func WithLogger(logger pkg.Logger) Option {
 	}
 }
 
+// ToolMiddleware 定义工具 handler 的中间件类型
+// 允许像链式调用一样包裹 ToolHandlerFunc
+type ToolMiddleware func(ToolHandlerFunc) ToolHandlerFunc
+
+// RateLimitMiddleware 返回一个速率限制中间件
+func RateLimitMiddleware(limiter pkg.RateLimiter) ToolMiddleware {
+	return func(next ToolHandlerFunc) ToolHandlerFunc {
+		return func(ctx context.Context, req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+			if limiter != nil && !limiter.Allow(req.Name) {
+				return nil, pkg.ErrRateLimitExceeded
+			}
+			return next(ctx, req)
+		}
+	}
+}
+
 func WithPagination(limit int) Option {
 	return func(s *Server) {
 		s.paginationLimit = limit
@@ -131,7 +147,10 @@ type toolEntry struct {
 
 type ToolHandlerFunc func(context.Context, *protocol.CallToolRequest) (*protocol.CallToolResult, error)
 
-func (server *Server) RegisterTool(tool *protocol.Tool, toolHandler ToolHandlerFunc) {
+func (server *Server) RegisterTool(tool *protocol.Tool, toolHandler ToolHandlerFunc, middlewares ...ToolMiddleware) {
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		toolHandler = middlewares[i](toolHandler)
+	}
 	server.tools.Store(tool.Name, &toolEntry{tool: tool, handler: toolHandler})
 	if !server.sessionManager.IsEmpty() {
 		if err := server.sendNotification4ToolListChanges(context.Background()); err != nil {
