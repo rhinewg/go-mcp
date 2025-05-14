@@ -4,12 +4,15 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/cenkalti/backoff/v4"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
@@ -58,11 +61,7 @@ func NewSSEClientTransport(serverURL string, opts ...SSEClientTransportOption) (
 		return nil, fmt.Errorf("failed to parse server URL: %w", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
-	x := &sseClientTransport{
-		ctx:             ctx,
-		cancel:          cancel,
+	t := &sseClientTransport{
 		serverURL:       parsedURL,
 		endpointChan:    make(chan struct{}, 1),
 		messageEndpoint: nil,
@@ -74,42 +73,42 @@ func NewSSEClientTransport(serverURL string, opts ...SSEClientTransportOption) (
 	}
 
 	for _, opt := range opts {
-		opt(x)
+		opt(t)
 	}
 
-	return x, nil
+	return t, nil
 }
 
-func (t *sseClientTransport) Start() error {
+func (t *sseClientTransport) Start() (err error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.ctx = ctx
+	t.cancel = cancel
+
+	defer func() {
+		if err != nil {
+			t.cancel()
+		}
+	}()
+
 	errChan := make(chan error, 1)
 	go func() {
 		defer pkg.Recover()
+		defer close(t.sseConnectClose)
 
-		req, err := http.NewRequestWithContext(t.ctx, http.MethodGet, t.serverURL.String(), nil)
-		if err != nil {
-			errChan <- fmt.Errorf("failed to create request: %w", err)
-			return
+		operation := func() error {
+			return t.startSSE()
 		}
 
-		req.Header.Set("Accept", "text/event-stream")
-		req.Header.Set("Cache-Control", "no-cache")
-		req.Header.Set("Connection", "keep-alive")
-
-		resp, err := t.client.Do(req) //nolint:bodyclose
-		if err != nil {
-			errChan <- fmt.Errorf("failed to connect to SSE stream: %w", err)
-			return
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			errChan <- fmt.Errorf("unexpected status code: %d, status: %s", resp.StatusCode, resp.Status)
-			return
+		notify := func(err error, d time.Duration) {
+			t.logger.Errorf("startSSE: %+v, duration=%s", err, d)
 		}
 
-		t.readSSE(resp.Body)
-
-		close(t.sseConnectClose)
+		if err := backoff.RetryNotify(operation, backoff.WithContext(backoff.NewExponentialBackOff(), t.ctx), notify); err != nil {
+			if !errors.Is(err, context.Canceled) {
+				t.logger.Errorf("backoff.Retry: %+v", err)
+			}
+			return
+		}
 	}()
 
 	// Wait for the endpoint to be received
@@ -125,9 +124,32 @@ func (t *sseClientTransport) Start() error {
 	return nil
 }
 
+func (t *sseClientTransport) startSSE() error {
+	req, err := http.NewRequestWithContext(t.ctx, http.MethodGet, t.serverURL.String(), nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Connection", "keep-alive")
+
+	resp, err := t.client.Do(req) //nolint:bodyclose
+	if err != nil {
+		return fmt.Errorf("failed to connect to SSE stream: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d, status: %s", resp.StatusCode, resp.Status)
+	}
+
+	return t.readSSE(resp.Body)
+}
+
 // readSSE continuously reads the SSE stream and processes events.
 // It runs until the connection is closed or an error occurs.
-func (t *sseClientTransport) readSSE(reader io.ReadCloser) {
+func (t *sseClientTransport) readSSE(reader io.ReadCloser) error {
 	defer func() {
 		_ = reader.Close()
 	}()
@@ -143,14 +165,12 @@ func (t *sseClientTransport) readSSE(reader io.ReadCloser) {
 				if event != "" && data != "" {
 					t.handleSSEEvent(event, data)
 				}
-				break
 			}
 			select {
 			case <-t.ctx.Done():
-				return
+				return t.ctx.Err()
 			default:
-				t.logger.Errorf("SSE stream error: %v", err)
-				return
+				return fmt.Errorf("SSE stream error: %w", err)
 			}
 		}
 
@@ -186,7 +206,10 @@ func (t *sseClientTransport) handleSSEEvent(event, data string) {
 		}
 		t.logger.Debugf("Received endpoint: %s", endpoint.String())
 		t.messageEndpoint = endpoint
-		close(t.endpointChan)
+		select {
+		case t.endpointChan <- struct{}{}:
+		default:
+		}
 	case "message":
 		ctx, cancel := context.WithTimeout(t.ctx, t.receiveTimeout)
 		defer cancel()

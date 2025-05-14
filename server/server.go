@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 	"github.com/ThinkInAIXYZ/go-mcp/server/session"
@@ -50,6 +52,12 @@ func WithPagination(limit int) Option {
 	}
 }
 
+func WithGenSessionIDFunc(genSessionID func(context.Context) string) Option {
+	return func(s *Server) {
+		s.genSessionID = genSessionID
+	}
+}
+
 type Server struct {
 	transport transport.ServerTransport
 
@@ -70,6 +78,8 @@ type Server struct {
 	paginationLimit int
 
 	logger pkg.Logger
+
+	genSessionID func(ctx context.Context) string
 }
 
 func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
@@ -80,14 +90,15 @@ func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
 			Resources: &protocol.ResourcesCapability{ListChanged: true, Subscribe: true},
 			Tools:     &protocol.ToolsCapability{ListChanged: true},
 		},
-		inShutdown: pkg.NewAtomicBool(),
-		serverInfo: &protocol.Implementation{},
-		logger:     pkg.DefaultLogger,
+		inShutdown:   pkg.NewAtomicBool(),
+		serverInfo:   &protocol.Implementation{},
+		logger:       pkg.DefaultLogger,
+		genSessionID: func(context.Context) string { return uuid.NewString() },
 	}
 
 	t.SetReceiver(transport.ServerReceiverF(server.receive))
 
-	server.sessionManager = session.NewManager(server.sessionDetection)
+	server.sessionManager = session.NewManager(server.sessionDetection, server.genSessionID)
 
 	for _, opt := range opts {
 		opt(server)
