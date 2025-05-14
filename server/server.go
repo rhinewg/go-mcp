@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 	"github.com/ThinkInAIXYZ/go-mcp/server/session"
@@ -60,6 +62,18 @@ func RateLimitMiddleware(limiter pkg.RateLimiter) ToolMiddleware {
 	}
 }
 
+func WithPagination(limit int) Option {
+	return func(s *Server) {
+		s.paginationLimit = limit
+	}
+}
+
+func WithGenSessionIDFunc(genSessionID func(context.Context) string) Option {
+	return func(s *Server) {
+		s.genSessionID = genSessionID
+	}
+}
+
 type Server struct {
 	transport transport.ServerTransport
 
@@ -77,7 +91,11 @@ type Server struct {
 	serverInfo   *protocol.Implementation
 	instructions string
 
+	paginationLimit int
+
 	logger pkg.Logger
+
+	genSessionID func(ctx context.Context) string
 }
 
 func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
@@ -88,14 +106,15 @@ func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
 			Resources: &protocol.ResourcesCapability{ListChanged: true, Subscribe: true},
 			Tools:     &protocol.ToolsCapability{ListChanged: true},
 		},
-		inShutdown: pkg.NewAtomicBool(),
-		serverInfo: &protocol.Implementation{},
-		logger:     pkg.DefaultLogger,
+		inShutdown:   pkg.NewAtomicBool(),
+		serverInfo:   &protocol.Implementation{},
+		logger:       pkg.DefaultLogger,
+		genSessionID: func(context.Context) string { return uuid.NewString() },
 	}
 
 	t.SetReceiver(transport.ServerReceiverF(server.receive))
 
-	server.sessionManager = session.NewManager(server.sessionDetection)
+	server.sessionManager = session.NewManager(server.sessionDetection, server.genSessionID)
 
 	for _, opt := range opts {
 		opt(server)
@@ -128,9 +147,7 @@ type toolEntry struct {
 
 type ToolHandlerFunc func(context.Context, *protocol.CallToolRequest) (*protocol.CallToolResult, error)
 
-// RegisterTool 支持 middleware
 func (server *Server) RegisterTool(tool *protocol.Tool, toolHandler ToolHandlerFunc, middlewares ...ToolMiddleware) {
-	// 依次包裹
 	for i := len(middlewares) - 1; i >= 0; i-- {
 		toolHandler = middlewares[i](toolHandler)
 	}

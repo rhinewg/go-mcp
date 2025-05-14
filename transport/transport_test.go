@@ -19,7 +19,7 @@ func newMockSessionManager() *mockSessionManager {
 	return &mockSessionManager{}
 }
 
-func (m *mockSessionManager) CreateSession() string {
+func (m *mockSessionManager) CreateSession(context.Context) string {
 	sessionID := uuid.NewString()
 	m.Store(sessionID, nil)
 	return sessionID

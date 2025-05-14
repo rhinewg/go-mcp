@@ -56,13 +56,13 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 		return nil, pkg.ErrRequestInvalid
 	}
 
-	if sessionID != "" && req.Method != protocol.Initialize && req.Method != protocol.Ping {
-		if s, ok := server.sessionManager.GetSession(sessionID); !ok {
-			return nil, pkg.ErrLackSession
-		} else if !s.GetReady() {
-			return nil, pkg.ErrSessionHasNotInitialized
-		}
-	}
+	// if sessionID != "" && req.Method != protocol.Initialize && req.Method != protocol.Ping {
+	// 	if s, ok := server.sessionManager.GetSession(sessionID); !ok {
+	// 		return nil, pkg.ErrLackSession
+	// 	} else if !s.GetReady() {
+	// 		return nil, pkg.ErrSessionHasNotInitialized
+	// 	}
+	// }
 
 	server.inFlyRequest.Add(1)
 
@@ -145,13 +145,13 @@ func (server *Server) receiveRequest(ctx context.Context, sessionID string, requ
 }
 
 func (server *Server) receiveNotify(sessionID string, notify *protocol.JSONRPCNotification) error {
-	if sessionID != "" {
-		if s, ok := server.sessionManager.GetSession(sessionID); !ok {
-			return pkg.ErrLackSession
-		} else if notify.Method != protocol.NotificationInitialized && !s.GetReady() {
-			return pkg.ErrSessionHasNotInitialized
-		}
-	}
+	// if sessionID != "" {
+	// 	if s, ok := server.sessionManager.GetSession(sessionID); !ok {
+	// 		return pkg.ErrLackSession
+	// 	} else if notify.Method != protocol.NotificationInitialized && !s.GetReady() {
+	// 		return pkg.ErrSessionHasNotInitialized
+	// 	}
+	// }
 
 	switch notify.Method {
 	case protocol.NotificationInitialized:
