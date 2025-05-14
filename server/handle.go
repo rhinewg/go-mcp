@@ -66,7 +66,13 @@ func (server *Server) handleRequestWithListPrompts(rawParams json.RawMessage) (*
 		prompts = append(prompts, *entry.prompt)
 		return true
 	})
-
+	if server.paginationLimit > 0 {
+		resourcesToReturn, nextCursor, err := protocol.PaginationLimit[protocol.Prompt](prompts, request.Cursor, server.paginationLimit)
+		return &protocol.ListPromptsResult{
+			Prompts:    resourcesToReturn,
+			NextCursor: nextCursor,
+		}, err
+	}
 	return &protocol.ListPromptsResult{
 		Prompts: prompts,
 	}, nil
@@ -93,7 +99,6 @@ func (server *Server) handleRequestWithListResources(rawParams json.RawMessage) 
 	if server.capabilities.Resources == nil {
 		return nil, pkg.ErrServerNotSupport
 	}
-
 	var request *protocol.ListResourcesRequest
 	if len(rawParams) > 0 {
 		if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
@@ -106,6 +111,13 @@ func (server *Server) handleRequestWithListResources(rawParams json.RawMessage) 
 		resources = append(resources, *entry.resource)
 		return true
 	})
+	if server.paginationLimit > 0 {
+		resourcesToReturn, nextCursor, err := protocol.PaginationLimit[protocol.Resource](resources, request.Cursor, server.paginationLimit)
+		return &protocol.ListResourcesResult{
+			Resources:  resourcesToReturn,
+			NextCursor: nextCursor,
+		}, err
+	}
 
 	return &protocol.ListResourcesResult{
 		Resources: resources,
@@ -129,7 +141,13 @@ func (server *Server) handleRequestWithListResourceTemplates(rawParams json.RawM
 		templates = append(templates, *entry.resourceTemplate)
 		return true
 	})
-
+	if server.paginationLimit > 0 {
+		resourcesToReturn, nextCursor, err := protocol.PaginationLimit[protocol.ResourceTemplate](templates, request.Cursor, server.paginationLimit)
+		return &protocol.ListResourceTemplatesResult{
+			ResourceTemplates: resourcesToReturn,
+			NextCursor:        nextCursor,
+		}, err
+	}
 	return &protocol.ListResourceTemplatesResult{
 		ResourceTemplates: templates,
 	}, nil
@@ -222,7 +240,13 @@ func (server *Server) handleRequestWithListTools(rawParams json.RawMessage) (*pr
 		tools = append(tools, entry.tool)
 		return true
 	})
-
+	if server.paginationLimit > 0 {
+		resourcesToReturn, nextCursor, err := protocol.PaginationLimit[*protocol.Tool](tools, request.Cursor, server.paginationLimit)
+		return &protocol.ListToolsResult{
+			Tools:      resourcesToReturn,
+			NextCursor: nextCursor,
+		}, err
+	}
 	return &protocol.ListToolsResult{Tools: tools}, nil
 }
 

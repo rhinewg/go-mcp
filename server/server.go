@@ -46,6 +46,12 @@ func WithLogger(logger pkg.Logger) Option {
 	}
 }
 
+func WithPagination(limit int) Option {
+	return func(s *Server) {
+		s.paginationLimit = limit
+	}
+}
+
 func WithGenSessionIDFunc(genSessionID func(context.Context) string) Option {
 	return func(s *Server) {
 		s.genSessionID = genSessionID
@@ -68,6 +74,8 @@ type Server struct {
 	capabilities *protocol.ServerCapabilities
 	serverInfo   *protocol.Implementation
 	instructions string
+
+	paginationLimit int
 
 	logger pkg.Logger
 
