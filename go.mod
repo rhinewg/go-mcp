@@ -3,7 +3,6 @@ module github.com/ThinkInAIXYZ/go-mcp
 go 1.18
 
 require (
-	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/google/uuid v1.6.0
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/tidwall/gjson v1.18.0
