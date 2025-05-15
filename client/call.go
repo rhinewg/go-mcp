@@ -218,6 +218,10 @@ func (client *Client) sendNotification4Initialized(ctx context.Context) error {
 	return client.sendMsgWithNotification(ctx, protocol.NotificationInitialized, protocol.NewInitializedNotification())
 }
 
+func (client *Client) sendNotification4Cancel(ctx context.Context, requestID protocol.RequestID, reason string) error {
+	return client.sendMsgWithNotification(ctx, protocol.NotificationCancelled, protocol.NewCancelledNotification(requestID, reason))
+}
+
 // Responsible for request and response assembly
 func (client *Client) callServer(ctx context.Context, method protocol.Method, params protocol.ClientRequest) (json.RawMessage, error) {
 	if !client.ready.Load() && (method != protocol.Initialize && method != protocol.Ping) {
@@ -235,6 +239,9 @@ func (client *Client) callServer(ctx context.Context, method protocol.Method, pa
 
 	select {
 	case <-ctx.Done():
+		if err := client.sendNotification4Cancel(context.Background(), requestID, ctx.Err().Error()); err != nil {
+			client.logger.Warnf("Failed to send cancellation notification: %v", err)
+		}
 		return nil, ctx.Err()
 	case response := <-respChan:
 		if err := response.Error; err != nil {

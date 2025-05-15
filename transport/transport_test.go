@@ -94,6 +94,7 @@ func testTransport(t *testing.T, client ClientTransport, server ServerTransport)
 		expectedMsgWithServerCh <- string(msg)
 		msgCh := make(chan []byte, 1)
 		go func() {
+			defer close(msgCh)
 			msgCh <- msg
 		}()
 		return msgCh, nil

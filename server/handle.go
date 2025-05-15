@@ -292,6 +292,26 @@ func (server *Server) handleNotifyWithInitialized(sessionID string, rawParams js
 	return nil
 }
 
+func (server *Server) handleNotifyWithCancelled(sessionID string, rawParams json.RawMessage) error {
+	var params protocol.CancelledNotification
+	if err := pkg.JSONUnmarshal(rawParams, &params); err != nil {
+		return err
+	}
+
+	s, ok := server.sessionManager.GetSession(sessionID)
+	if !ok {
+		return pkg.ErrLackSession
+	}
+
+	cancel, ok := s.GetClientReqID2cancelFunc().Get(fmt.Sprint(params.RequestID))
+	if !ok {
+		return nil
+	}
+	cancel()
+
+	return nil
+}
+
 func matchesTemplate(uri string, template *uritemplate.Template) bool {
 	return template.Regexp().MatchString(uri)
 }

@@ -77,7 +77,18 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 		defer server.inFlyRequest.Done()
 		defer close(ch)
 
+		if s, ok := server.sessionManager.GetSession(sessionID); ok && req.Method != protocol.Initialize {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithCancel(ctx)
+			requestID := fmt.Sprint(req.ID)
+			s.GetClientReqID2cancelFunc().Set(requestID, cancel)
+			defer s.GetClientReqID2cancelFunc().Remove(requestID)
+		}
+
 		resp := server.receiveRequest(ctx, sessionID, req)
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return
+		}
 		message, err := json.Marshal(resp)
 		if err != nil {
 			server.logger.Errorf("receive json marshal response:%+v error: %s", resp, err.Error())
@@ -156,6 +167,8 @@ func (server *Server) receiveNotify(sessionID string, notify *protocol.JSONRPCNo
 	switch notify.Method {
 	case protocol.NotificationInitialized:
 		return server.handleNotifyWithInitialized(sessionID, notify.RawParams)
+	case protocol.NotificationCancelled:
+		return server.handleNotifyWithCancelled(sessionID, notify.RawParams)
 	default:
 		return fmt.Errorf("%w: method=%s", pkg.ErrMethodNotSupport, notify.Method)
 	}
@@ -167,7 +180,7 @@ func (server *Server) receiveResponse(sessionID string, response *protocol.JSONR
 		return pkg.ErrLackSession
 	}
 
-	respChan, ok := s.GetReqID2respChan().Get(fmt.Sprint(response.ID))
+	respChan, ok := s.GetServerReqID2respChan().Get(fmt.Sprint(response.ID))
 	if !ok {
 		return fmt.Errorf("%w: sessionID=%+v, requestID=%+v", pkg.ErrLackResponseChan, sessionID, response.ID)
 	}
