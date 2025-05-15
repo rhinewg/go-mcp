@@ -111,26 +111,30 @@ func getTransport() (t transport.ServerTransport) {
 	return t
 }
 
-func currentTime(_ context.Context, request *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+func currentTime(ctx context.Context, request *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
 	req := new(currentTimeReq)
 	if err := protocol.VerifyAndUnmarshal(request.RawArguments, &req); err != nil {
 		return nil, err
 	}
 
-	loc, err := time.LoadLocation(req.Timezone)
-	if err != nil {
-		return nil, fmt.Errorf("parse timezone with error: %v", err)
-	}
-	text := fmt.Sprintf(`current time is %s`, time.Now().In(loc))
-
-	return &protocol.CallToolResult{
-		Content: []protocol.Content{
-			&protocol.TextContent{
-				Type: "text",
-				Text: text,
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.Tick(time.Second * 1):
+		loc, err := time.LoadLocation(req.Timezone)
+		if err != nil {
+			return nil, fmt.Errorf("parse timezone with error: %v", err)
+		}
+		text := fmt.Sprintf(`current time is %s`, time.Now().In(loc))
+		return &protocol.CallToolResult{
+			Content: []protocol.Content{
+				&protocol.TextContent{
+					Type: "text",
+					Text: text,
+				},
 			},
-		},
-	}, nil
+		}, nil
+	}
 }
 
 func deleteFile(ctx context.Context, request *protocol.CallToolRequest) (*protocol.CallToolResult, error) {

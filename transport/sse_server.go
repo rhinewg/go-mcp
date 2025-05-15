@@ -296,13 +296,10 @@ func (t *sseServerTransport) handleMessage(w http.ResponseWriter, r *http.Reques
 	go func() {
 		defer pkg.Recover()
 
-		msg := <-outputMsgCh
-		if len(msg) == 0 {
-			t.logger.Errorf("handle request fail")
-			return
-		}
-		if err := t.Send(context.Background(), sessionID, msg); err != nil {
-			t.logger.Errorf("Failed to send message: %v", err)
+		for msg := range outputMsgCh {
+			if e := t.Send(context.Background(), sessionID, msg); e != nil {
+				t.logger.Errorf("Failed to send message: %v", e)
+			}
 		}
 	}()
 }

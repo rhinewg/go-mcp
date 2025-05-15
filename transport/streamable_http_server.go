@@ -237,23 +237,19 @@ func (t *streamableHTTPServerTransport) handlePost(w http.ResponseWriter, r *htt
 		return
 	}
 
-	msg := <-outputMsgCh
-	if len(msg) == 0 {
-		t.writeError(w, http.StatusInternalServerError, "handle request fail")
-		return
-	}
-
-	if t.stateMode == Stateful {
-		if sid := ctx.Value(SessionIDForReturnKey{}).(*SessionIDForReturn); sid.SessionID != "" { // in server.handleRequestWithInitialize assign
-			w.Header().Set(sessionIDHeader, sid.SessionID)
+	for msg := range outputMsgCh {
+		if t.stateMode == Stateful {
+			if sid := ctx.Value(SessionIDForReturnKey{}).(*SessionIDForReturn); sid.SessionID != "" { // in server.handleRequestWithInitialize assign
+				w.Header().Set(sessionIDHeader, sid.SessionID)
+			}
 		}
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
 
-	if _, err = w.Write(msg); err != nil {
-		t.logger.Errorf("streamableHTTPServerTransport post write: %+v", err)
-		return
+		if _, err = w.Write(msg); err != nil {
+			t.logger.Errorf("streamableHTTPServerTransport post write: %+v", err)
+			return
+		}
 	}
 }
 

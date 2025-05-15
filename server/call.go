@@ -130,8 +130,8 @@ func (server *Server) callClient(ctx context.Context, sessionID string, method p
 
 	requestID := strconv.FormatInt(session.IncRequestID(), 10)
 	respChan := make(chan *protocol.JSONRPCResponse, 1)
-	session.GetReqID2respChan().Set(requestID, respChan)
-	defer session.GetReqID2respChan().Remove(requestID)
+	session.GetServerReqID2respChan().Set(requestID, respChan)
+	defer session.GetServerReqID2respChan().Remove(requestID)
 
 	if err := server.sendMsgWithRequest(ctx, sessionID, requestID, method, params); err != nil {
 		return nil, fmt.Errorf("callClient: %w", err)
