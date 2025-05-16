@@ -60,10 +60,27 @@ func main() {
 	}
 	limiter.SetToolLimit(tool2.Name, pkg.Rate{Limit: 1.0, Burst: 1})
 
+	testResource := &protocol.Resource{
+		URI:      "file:///test.txt",
+		Name:     "test1.txt",
+		MimeType: "text/plain-txt",
+	}
+	testResourceContent := protocol.TextResourceContents{
+		URI:      testResource.URI,
+		MimeType: testResource.MimeType,
+		Text:     "test",
+	}
+
 	// register tool and start mcp server
 	srv.RegisterTool(tool1, currentTime, server.RateLimitMiddleware(limiter))
 	srv.RegisterTool(tool2, deleteFile, server.RateLimitMiddleware(limiter))
-	// srv.RegisterResource()
+	srv.RegisterResource(testResource, func(context.Context, *protocol.ReadResourceRequest) (*protocol.ReadResourceResult, error) {
+		return &protocol.ReadResourceResult{
+			Contents: []protocol.ResourceContents{
+				testResourceContent,
+			},
+		}, nil
+	})
 	// srv.RegisterPrompt()
 	// srv.RegisterResourceTemplate()
 
