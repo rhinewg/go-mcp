@@ -73,13 +73,20 @@ func getTypeUUID(t reflect.Type) string {
 
 func reflectSchemaByObject(t reflect.Type) (*Property, error) {
 	var (
-		properties     = make(map[string]*Property)
-		requiredFields = make([]string, 0)
-		enumValues     = make([]string, 0)
+		properties      = make(map[string]*Property)
+		requiredFields  = make([]string, 0)
+		enumValues      = make([]string, 0)
+		anonymousFields = make([]reflect.StructField, 0)
 	)
 
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
+
+		if field.Anonymous {
+			anonymousFields = append(anonymousFields, field)
+			continue
+		}
+
 		if !field.IsExported() {
 			continue
 		}
@@ -142,6 +149,20 @@ func reflectSchemaByObject(t reflect.Type) (*Property, error) {
 			}
 			item.Enum = enumValues
 		}
+	}
+
+	for _, field := range anonymousFields {
+		object, err := reflectSchemaByObject(field.Type)
+		if err != nil {
+			return nil, err
+		}
+		for propName, propValue := range object.Properties {
+			if _, ok := properties[propName]; ok {
+				return nil, fmt.Errorf("duplicate property name %s in anonymous struct", propName)
+			}
+			properties[propName] = propValue
+		}
+		requiredFields = append(requiredFields, object.Required...)
 	}
 
 	property := &Property{
