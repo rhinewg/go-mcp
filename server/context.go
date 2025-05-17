@@ -18,3 +18,7 @@ func getSessionIDFromCtx(ctx context.Context) (string, error) {
 	}
 	return sessionID.(string), nil
 }
+
+func GetSessionIDFromCtx(ctx context.Context) (string, error) {
+	return getSessionIDFromCtx(ctx)
+}
