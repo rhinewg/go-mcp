@@ -251,10 +251,11 @@ func (t *streamableHTTPServerTransport) handlePost(w http.ResponseWriter, r *htt
 		if t.stateMode == Stateful {
 			w.Header().Set(sessionIDHeader, ctx.Value(SessionIDForReturnKey{}).(*SessionIDForReturn).SessionID)
 		}
-
 		if _, err = fmt.Fprintf(w, "data: %s\n\n", msg); err != nil {
 			t.logger.Errorf("Failed to write message: %v", err)
 		}
+		flusher.Flush()
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -266,12 +267,17 @@ func (t *streamableHTTPServerTransport) handlePost(w http.ResponseWriter, r *htt
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 
-		for range ticker.C {
-			if _, e := fmt.Fprintf(w, " : heartbeat\n\n"); e != nil {
-				t.logger.Errorf("Failed to write heartbeat: %v", e)
-				continue
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if _, e := fmt.Fprintf(w, " : heartbeat\n\n"); e != nil {
+					t.logger.Errorf("Failed to write heartbeat: %v", e)
+					continue
+				}
+				flusher.Flush()
 			}
-			flusher.Flush()
 		}
 	}()
 

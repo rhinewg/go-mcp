@@ -41,7 +41,7 @@ func (server *Server) Sampling(ctx context.Context, request *protocol.CreateMess
 	}
 
 	if s.GetClientCapabilities() == nil || s.GetClientCapabilities().Sampling == nil {
-		return nil, pkg.ErrServerNotSupport
+		return nil, pkg.ErrClientNotSupport
 	}
 
 	response, err := server.callClient(ctx, sessionID, protocol.SamplingCreateMessage, request)
@@ -56,19 +56,14 @@ func (server *Server) Sampling(ctx context.Context, request *protocol.CreateMess
 	return &result, nil
 }
 
-func (server *Server) Progress(ctx context.Context, notify *protocol.ProgressNotification) error {
-	sessionID, err := getSessionIDFromCtx(ctx)
-	if err != nil {
-		return err
-	}
-
+func (server *Server) SendProgressNotification(ctx context.Context, notify *protocol.ProgressNotification) error {
 	progressToken, err := getProgressTokenFromCtx(ctx)
 	if err != nil {
 		return err
 	}
 	notify.ProgressToken = progressToken
 
-	if err = server.sendMsgWithNotification(ctx, sessionID, protocol.NotificationProgress, notify); err != nil {
+	if err = server.sendMsgWithNotification(ctx, "", protocol.NotificationProgress, notify); err != nil {
 		return err
 	}
 

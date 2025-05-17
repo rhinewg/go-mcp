@@ -85,7 +85,7 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 			defer s.GetClientReqID2cancelFunc().Remove(requestID)
 		}
 
-		if r := gjson.GetBytes(req.RawParams, "_meta.progressToken"); r.Exists() {
+		if r := gjson.GetBytes(req.RawParams, fmt.Sprintf("_meta.%s", protocol.ProgressTokenKey)); r.Exists() {
 			ctx = setProgressTokenToCtx(ctx, r.Value())
 		}
 
@@ -106,7 +106,9 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 }
 
 func (server *Server) receiveRequest(ctx context.Context, sessionID string, request *protocol.JSONRPCRequest) *protocol.JSONRPCResponse {
-	ctx = setSessionIDToCtx(ctx, sessionID)
+	if sessionID != "" {
+		ctx = setSessionIDToCtx(ctx, sessionID)
+	}
 
 	if request.Method != protocol.Ping {
 		server.sessionManager.UpdateSessionLastActiveAt(sessionID)
