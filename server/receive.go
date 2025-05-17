@@ -85,6 +85,10 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 			defer s.GetClientReqID2cancelFunc().Remove(requestID)
 		}
 
+		if r := gjson.GetBytes(req.RawParams, "_meta.progressToken"); r.Exists() {
+			ctx = setProgressTokenToCtx(ctx, r.Value())
+		}
+
 		ctx = setSendChanToCtx(ctx, ch)
 
 		resp := server.receiveRequest(ctx, sessionID, req)
