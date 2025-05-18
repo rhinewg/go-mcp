@@ -63,7 +63,7 @@ func test(t *testing.T, runServer func() error, transportClient transport.Client
 	bytes, _ = json.Marshal(callResult)
 	fmt.Printf("Tool call result: %s\n", bytes)
 
-	progressCh := make(chan *protocol.ProgressNotification, 5)
+	progressCh := make(chan *protocol.ProgressNotification)
 	go func() {
 		for progress := range progressCh {
 			fmt.Printf("Progress: %+v\n", progress)

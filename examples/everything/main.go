@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -224,12 +225,11 @@ func generatePPT(ctx context.Context, request *protocol.CallToolRequest) (*proto
 		return nil, err
 	}
 
-	for i := 1; i <= 3; i++ {
-		notify := protocol.NewProgressNotification(float64(i), 10, "generate PPT ing")
+	for i := 1; i <= 10; i++ {
+		notify := protocol.NewProgressNotification(float64(i), 10, "generate PPT ing"+strconv.Itoa(i))
 		if err := srv.SendProgressNotification(ctx, notify); err != nil {
 			log.Printf("SendProgressNotification error: %v", err)
 		}
-		time.Sleep(time.Millisecond * 100)
 	}
 
 	return &protocol.CallToolResult{
