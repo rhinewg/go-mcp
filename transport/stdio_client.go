@@ -31,11 +31,11 @@ func WithStdioClientOptionEnv(env ...string) StdioClientTransportOption {
 const mcpMessageDelimiter = '\n'
 
 type stdioClientTransport struct {
-	cmd      *exec.Cmd
-	receiver clientReceiver
-	reader   io.Reader
-	writer   io.WriteCloser
-	readerr  io.Reader
+	cmd       *exec.Cmd
+	receiver  clientReceiver
+	reader    io.Reader
+	writer    io.WriteCloser
+	errReader io.Reader
 
 	logger pkg.Logger
 
@@ -64,10 +64,10 @@ func NewStdioClientTransport(command string, args []string, opts ...StdioClientT
 	}
 
 	t := &stdioClientTransport{
-		cmd:     cmd,
-		reader:  stdout,
-		writer:  stdin,
-		readerr: stderr,
+		cmd:       cmd,
+		reader:    stdout,
+		writer:    stdin,
+		errReader: stderr,
 
 		logger: pkg.DefaultLogger,
 	}
@@ -91,15 +91,13 @@ func (t *stdioClientTransport) Start() error {
 		defer pkg.Recover()
 		defer t.wg.Done()
 		t.startReceive(innerCtx)
-
 	}()
 
 	t.wg.Add(1)
 	go func() {
 		defer pkg.Recover()
 		defer t.wg.Done()
-		t.receiveStderr(innerCtx)
-
+		t.startReceiveErr(innerCtx)
 	}()
 
 	return nil
@@ -163,8 +161,8 @@ func (t *stdioClientTransport) startReceive(ctx context.Context) {
 	}
 }
 
-func (t *stdioClientTransport) receiveStderr(ctx context.Context) {
-	s := bufio.NewReader(t.readerr)
+func (t *stdioClientTransport) startReceiveErr(ctx context.Context) {
+	s := bufio.NewReader(t.errReader)
 
 	for {
 		line, err := s.ReadBytes('\n')
