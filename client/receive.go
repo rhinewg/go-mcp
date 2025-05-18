@@ -19,6 +19,14 @@ func (client *Client) receive(_ context.Context, msg []byte) error {
 		if err := pkg.JSONUnmarshal(msg, &notify); err != nil {
 			return err
 		}
+		if notify.Method == protocol.NotificationProgress { // need sync handle
+			if err := client.receiveNotify(context.Background(), notify); err != nil {
+				notify.RawParams = nil // simplified log
+				client.logger.Errorf("receive notify:%+v error: %s", notify, err.Error())
+				return err
+			}
+			return nil
+		}
 		go func() {
 			defer pkg.Recover()
 
@@ -37,15 +45,11 @@ func (client *Client) receive(_ context.Context, msg []byte) error {
 		if err := pkg.JSONUnmarshal(msg, &resp); err != nil {
 			return err
 		}
-		go func() {
-			defer pkg.Recover()
-
-			if err := client.receiveResponse(resp); err != nil {
-				resp.RawResult = nil // simplified log
-				client.logger.Errorf("receive response:%+v error: %s", resp, err.Error())
-				return
-			}
-		}()
+		if err := client.receiveResponse(resp); err != nil {
+			resp.RawResult = nil // simplified log
+			client.logger.Errorf("receive response:%+v error: %s", resp, err.Error())
+			return err
+		}
 		return nil
 	}
 
