@@ -227,7 +227,7 @@ func generatePPT(ctx context.Context, request *protocol.CallToolRequest) (*proto
 	for i := 1; i <= 3; i++ {
 		notify := protocol.NewProgressNotification(float64(i), 10, "generate PPT ing")
 		if err := srv.SendProgressNotification(ctx, notify); err != nil {
-			return nil, err
+			log.Printf("SendProgressNotification error: %v", err)
 		}
 		time.Sleep(time.Millisecond * 100)
 	}
