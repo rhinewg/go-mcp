@@ -41,7 +41,7 @@ func (server *Server) Sampling(ctx context.Context, request *protocol.CreateMess
 	}
 
 	if s.GetClientCapabilities() == nil || s.GetClientCapabilities().Sampling == nil {
-		return nil, pkg.ErrServerNotSupport
+		return nil, pkg.ErrClientNotSupport
 	}
 
 	response, err := server.callClient(ctx, sessionID, protocol.SamplingCreateMessage, request)
@@ -54,6 +54,20 @@ func (server *Server) Sampling(ctx context.Context, request *protocol.CreateMess
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 	return &result, nil
+}
+
+func (server *Server) SendProgressNotification(ctx context.Context, notify *protocol.ProgressNotification) error {
+	progressToken, err := getProgressTokenFromCtx(ctx)
+	if err != nil {
+		return err
+	}
+	notify.ProgressToken = progressToken
+
+	if err = server.sendMsgWithNotification(ctx, "", protocol.NotificationProgress, notify); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (server *Server) sendNotification4ToolListChanges(ctx context.Context) error {
