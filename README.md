@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <a href="README_CN.md">中文文档</a>
+  <a href="README_CN.md">简体中文</a> | <a href="README_TW.md">繁體中文</a>
 </p>
 
 ## 🚀 Overview
@@ -202,6 +202,7 @@ func main() {
 	}
 }
 ```
+
 [Reference：A more complete example](https://github.com/ThinkInAIXYZ/go-mcp/blob/main/examples/http_handler/main.go)
 
 ## 🏗️ Architecture Design
