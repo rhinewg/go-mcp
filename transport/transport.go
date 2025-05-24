@@ -34,12 +34,28 @@ type ClientTransport interface {
 
 type clientReceiver interface {
 	Receive(ctx context.Context, msg []byte) error
+	Interrupt(err error)
 }
 
-type ClientReceiverF func(ctx context.Context, msg []byte) error
+type ClientReceiver struct {
+	receive   func(ctx context.Context, msg []byte) error
+	interrupt func(err error)
+}
 
-func (f ClientReceiverF) Receive(ctx context.Context, msg []byte) error {
-	return f(ctx, msg)
+func (r *ClientReceiver) Receive(ctx context.Context, msg []byte) error {
+	return r.receive(ctx, msg)
+}
+
+func (r *ClientReceiver) Interrupt(err error) {
+	r.interrupt(err)
+}
+
+func NewClientReceiver(receive func(ctx context.Context, msg []byte) error, interrupt func(err error)) clientReceiver {
+	r := &ClientReceiver{
+		receive:   receive,
+		interrupt: interrupt,
+	}
+	return r
 }
 
 type ServerTransport interface {

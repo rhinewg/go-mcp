@@ -90,6 +90,7 @@ func (t *stdioClientTransport) Start() error {
 	go func() {
 		defer pkg.Recover()
 		defer t.wg.Done()
+
 		t.startReceive(innerCtx)
 	}()
 
@@ -97,6 +98,7 @@ func (t *stdioClientTransport) Start() error {
 	go func() {
 		defer pkg.Recover()
 		defer t.wg.Done()
+
 		t.startReceiveErr(innerCtx)
 	}()
 
@@ -134,11 +136,13 @@ func (t *stdioClientTransport) startReceive(ctx context.Context) {
 	for {
 		line, err := s.ReadBytes('\n')
 		if err != nil {
+			t.receiver.Interrupt(fmt.Errorf("stdout read error: %w", err))
+
 			if errors.Is(err, io.ErrClosedPipe) || // This error occurs during unit tests, suppressing it here
 				errors.Is(err, io.EOF) {
 				return
 			}
-			t.logger.Errorf("client receive unexpected error reading input: %v", err)
+			t.logger.Errorf("stdout read error: %+v", err)
 			return
 		}
 
