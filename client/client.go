@@ -88,7 +88,7 @@ func NewClient(t transport.ClientTransport, opts ...Option) (*Client, error) {
 		closed:                   make(chan struct{}),
 		logger:                   pkg.DefaultLogger,
 	}
-	t.SetReceiver(transport.ClientReceiverF(client.receive))
+	t.SetReceiver(transport.NewClientReceiver(client.receive, client.receiveInterrupt))
 
 	for _, opt := range opts {
 		opt(client)

@@ -102,9 +102,11 @@ func testTransport(t *testing.T, client ClientTransport, server ServerTransport)
 	server.SetSessionManager(newMockSessionManager())
 
 	expectedMsgWithClientCh := make(chan string, 1)
-	client.SetReceiver(ClientReceiverF(func(_ context.Context, msg []byte) error {
+	client.SetReceiver(NewClientReceiver(func(_ context.Context, msg []byte) error {
 		expectedMsgWithClientCh <- string(msg)
 		return nil
+	}, func(_ error) {
+		close(expectedMsgWithClientCh)
 	}))
 
 	errCh := make(chan error, 1)

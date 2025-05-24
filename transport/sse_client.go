@@ -115,6 +115,7 @@ func (t *sseClientTransport) Start() (err error) {
 					return nil
 				}
 				t.logger.Errorf("startSSE: %+v", e)
+				t.receiver.Interrupt(fmt.Errorf("SSE connection disconnection: %w", e))
 				return e
 			}
 			return nil

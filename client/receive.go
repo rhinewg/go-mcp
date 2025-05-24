@@ -11,8 +11,10 @@ import (
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 )
 
-func (client *Client) receive(_ context.Context, msg []byte) error {
+func (client *Client) receive(ctx context.Context, msg []byte) error {
 	defer pkg.Recover()
+
+	ctx = pkg.NewCancelShieldContext(ctx)
 
 	if !gjson.GetBytes(msg, "id").Exists() {
 		notify := &protocol.JSONRPCNotification{}
@@ -20,7 +22,7 @@ func (client *Client) receive(_ context.Context, msg []byte) error {
 			return err
 		}
 		if notify.Method == protocol.NotificationProgress { // need sync handle
-			if err := client.receiveNotify(context.Background(), notify); err != nil {
+			if err := client.receiveNotify(ctx, notify); err != nil {
 				notify.RawParams = nil // simplified log
 				client.logger.Errorf("receive notify:%+v error: %s", notify, err.Error())
 				return err
@@ -30,7 +32,7 @@ func (client *Client) receive(_ context.Context, msg []byte) error {
 		go func() {
 			defer pkg.Recover()
 
-			if err := client.receiveNotify(context.Background(), notify); err != nil {
+			if err := client.receiveNotify(ctx, notify); err != nil {
 				notify.RawParams = nil // simplified log
 				client.logger.Errorf("receive notify:%+v error: %s", notify, err.Error())
 				return
@@ -63,7 +65,7 @@ func (client *Client) receive(_ context.Context, msg []byte) error {
 	go func() {
 		defer pkg.Recover()
 
-		if err := client.receiveRequest(context.Background(), req); err != nil {
+		if err := client.receiveRequest(ctx, req); err != nil {
 			req.RawParams = nil // simplified log
 			client.logger.Errorf("receive request:%+v error: %s", req, err.Error())
 			return
@@ -133,4 +135,13 @@ func (client *Client) receiveResponse(response *protocol.JSONRPCResponse) error 
 		return fmt.Errorf("%w: response=%+v", pkg.ErrDuplicateResponseReceived, response)
 	}
 	return nil
+}
+
+func (client *Client) receiveInterrupt(err error) {
+	for reqID, respChan := range client.reqID2respChan.Items() {
+		select {
+		case respChan <- protocol.NewJSONRPCErrorResponse(reqID, protocol.ConnectionError, err.Error()):
+		default:
+		}
+	}
 }
