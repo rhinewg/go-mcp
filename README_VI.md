@@ -41,9 +41,9 @@ Go-MCP là phiên bản Go mạnh mẽ của MCP SDK, triển khai Model Context
 ## 🛠️ Cài đặt
 Yêu cầu Go 1.18 trở lên.
 
-## 🎯 Quick Start
+## 🎯 Bắt đầu
 
-### Client Example
+### Ví dụ máy Client
 
 ```go
 package main
@@ -79,7 +79,7 @@ func main() {
 }
 ```
 
-### Server Example
+### Ví dụ Máy chủ
 
 ```go
 package main
@@ -148,7 +148,7 @@ func handleTimeRequest(ctx context.Context, req *protocol.CallToolRequest) (*pro
 }
 ```
 
-### Integration With Gin Server
+### Tích hợp với Gin Framework
 
 ```go
 package main
@@ -171,13 +171,13 @@ func main() {
 		log.Panicf("new sse transport and hander with error: %v", err)
 	}
 
-	// new mcp server
+	// Tạo máy chủ mcp
 	mcpServer, _ := server.NewServer(sseTransport)
 
-	// register tool with mcpServer
+	// đăng ký tool with mcpServer
 	// mcpServer.RegisterTool(tool, toolHandler)
 
-	// start mcp Server
+	// Chạy mcp Server
 	go func() {
 		mcpServer.Run()
 	}()
