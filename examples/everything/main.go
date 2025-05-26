@@ -83,10 +83,11 @@ func main() {
 		Text:     "test",
 	}
 
+	rateLimit := server.RateLimitMiddleware(limiter)
 	// register tool and start mcp server
-	srv.RegisterTool(tool1, currentTime, server.RateLimitMiddleware(limiter))
-	srv.RegisterTool(tool2, deleteFile, server.RateLimitMiddleware(limiter))
-	srv.RegisterTool(tool3, generatePPT, server.RateLimitMiddleware(limiter))
+	srv.RegisterTool(tool1, currentTime, rateLimit)
+	srv.RegisterTool(tool2, deleteFile, rateLimit)
+	srv.RegisterTool(tool3, generatePPT, rateLimit)
 	srv.RegisterResource(testResource, func(context.Context, *protocol.ReadResourceRequest) (*protocol.ReadResourceResult, error) {
 		return &protocol.ReadResourceResult{
 			Contents: []protocol.ResourceContents{
