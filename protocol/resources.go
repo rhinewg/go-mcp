@@ -31,8 +31,8 @@ type ListResourceTemplatesRequest struct {
 
 // ListResourceTemplatesResult represents the response to a list resource templates request
 type ListResourceTemplatesResult struct {
-	ResourceTemplates []ResourceTemplate `json:"resourceTemplates"`
-	NextCursor        Cursor             `json:"nextCursor,omitempty"`
+	ResourceTemplates []*ResourceTemplate `json:"resourceTemplates"`
+	NextCursor        Cursor              `json:"nextCursor,omitempty"`
 }
 
 // ReadResourceRequest represents a request to read a specific resource
@@ -307,7 +307,7 @@ func NewListResourceTemplatesRequest() *ListResourceTemplatesRequest {
 }
 
 // NewListResourceTemplatesResult creates a new list resource templates response
-func NewListResourceTemplatesResult(templates []ResourceTemplate, nextCursor Cursor) *ListResourceTemplatesResult {
+func NewListResourceTemplatesResult(templates []*ResourceTemplate, nextCursor Cursor) *ListResourceTemplatesResult {
 	return &ListResourceTemplatesResult{
 		ResourceTemplates: templates,
 		NextCursor:        nextCursor,

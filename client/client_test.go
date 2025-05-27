@@ -101,7 +101,7 @@ func TestClientCall(t *testing.T) {
 				return client.ListResourceTemplates(context.Background())
 			},
 			request:          protocol.NewListResourceTemplatesRequest(),
-			expectedResponse: protocol.NewListResourceTemplatesResult([]protocol.ResourceTemplate{{Name: "template1"}, {Name: "template2"}}, ""),
+			expectedResponse: protocol.NewListResourceTemplatesResult([]*protocol.ResourceTemplate{{Name: "template1"}, {Name: "template2"}}, ""),
 		},
 		{
 			name: "test_subscribe_resource_change",

@@ -203,7 +203,7 @@ func TestServerHandle(t *testing.T) {
 			method:  protocol.ResourceListTemplates,
 			request: protocol.ListResourceTemplatesRequest{},
 			expectedResponse: protocol.ListResourceTemplatesResult{
-				ResourceTemplates: []protocol.ResourceTemplate{*testResourceTemplate},
+				ResourceTemplates: []*protocol.ResourceTemplate{testResourceTemplate},
 			},
 		},
 		{
