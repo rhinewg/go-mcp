@@ -76,7 +76,7 @@ func TestServerHandle(t *testing.T) {
 	testPrompt := &protocol.Prompt{
 		Name:        "test_prompt",
 		Description: "test_prompt_description",
-		Arguments: []protocol.PromptArgument{
+		Arguments: []*protocol.PromptArgument{
 			{
 				Name:        "params1",
 				Description: "params1's description",
@@ -97,7 +97,7 @@ func TestServerHandle(t *testing.T) {
 		Name:     "test.txt",
 		MimeType: "text/plain-txt",
 	}
-	testResourceContent := protocol.TextResourceContents{
+	testResourceContent := &protocol.TextResourceContents{
 		URI:      testResource.URI,
 		MimeType: testResource.MimeType,
 		Text:     "test",
@@ -169,7 +169,7 @@ func TestServerHandle(t *testing.T) {
 			method:  protocol.PromptsList,
 			request: protocol.ListPromptsRequest{},
 			expectedResponse: protocol.ListPromptsResult{
-				Prompts: []protocol.Prompt{*testPrompt},
+				Prompts: []*protocol.Prompt{testPrompt},
 			},
 		},
 		{
@@ -185,7 +185,7 @@ func TestServerHandle(t *testing.T) {
 			method:  protocol.ResourcesList,
 			request: protocol.ListResourcesRequest{},
 			expectedResponse: protocol.ListResourcesResult{
-				Resources: []protocol.Resource{*testResource},
+				Resources: []*protocol.Resource{testResource},
 			},
 		},
 		{
@@ -316,7 +316,7 @@ func TestServerNotify(t *testing.T) {
 	testPrompt := &protocol.Prompt{
 		Name:        "test_prompt",
 		Description: "test_prompt_description",
-		Arguments: []protocol.PromptArgument{
+		Arguments: []*protocol.PromptArgument{
 			{
 				Name:        "params1",
 				Description: "params1's description",
@@ -334,7 +334,7 @@ func TestServerNotify(t *testing.T) {
 		Name:     "test.txt",
 		MimeType: "text/plain-txt",
 	}
-	testResourceContent := protocol.TextResourceContents{
+	testResourceContent := &protocol.TextResourceContents{
 		URI:      testResource.URI,
 		MimeType: testResource.MimeType,
 		Text:     "test",
@@ -483,8 +483,8 @@ func testServerInit(t *testing.T, server *Server, in io.Writer, outScan *bufio.S
 
 	expectedResp := protocol.NewJSONRPCSuccessResponse(uuid, protocol.InitializeResult{
 		ProtocolVersion: protocol.Version,
-		Capabilities:    *server.capabilities,
-		ServerInfo:      *server.serverInfo,
+		Capabilities:    server.capabilities,
+		ServerInfo:      server.serverInfo,
 	})
 	expectedRespBytes, err := json.Marshal(expectedResp)
 	if err != nil {
@@ -569,7 +569,7 @@ func TestServerHandleForPage(t *testing.T) {
 		testPrompt := &protocol.Prompt{
 			Name:        fmt.Sprintf("test_prompt_%d", i),
 			Description: fmt.Sprintf("test_prompt_description_%d", i),
-			Arguments: []protocol.PromptArgument{
+			Arguments: []*protocol.PromptArgument{
 				{
 					Name:        "params1",
 					Description: "params1's description",
@@ -591,7 +591,7 @@ func TestServerHandleForPage(t *testing.T) {
 			Name:     fmt.Sprintf("test%d.txt", i),
 			MimeType: "text/plain-txt",
 		}
-		testResourceContent := protocol.TextResourceContents{
+		testResourceContent := &protocol.TextResourceContents{
 			URI:      testResource.URI,
 			MimeType: testResource.MimeType,
 			Text:     fmt.Sprintf("test%d", i),
@@ -610,7 +610,7 @@ func TestServerHandleForPage(t *testing.T) {
 			URITemplate: fmt.Sprintf("file:///{path}/%d", i),
 			Name:        fmt.Sprintf("test_%d", i),
 		}
-		testResourceContent := protocol.TextResourceContents{
+		testResourceContent := &protocol.TextResourceContents{
 			URI:      fmt.Sprintf("file:///test%d.txt", i),
 			MimeType: "text/plain-txt",
 			Text:     fmt.Sprintf("test%d", i),
