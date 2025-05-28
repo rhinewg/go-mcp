@@ -131,13 +131,13 @@ func (server *Server) handleRequestWithListResourceTemplates(rawParams json.RawM
 		}
 	}
 
-	templates := make([]protocol.ResourceTemplate, 0)
+	templates := make([]*protocol.ResourceTemplate, 0)
 	server.resourceTemplates.Range(func(_ string, entry *resourceTemplateEntry) bool {
-		templates = append(templates, *entry.resourceTemplate)
+		templates = append(templates, entry.resourceTemplate)
 		return true
 	})
 	if server.paginationLimit > 0 {
-		resourcesToReturn, nextCursor, err := protocol.PaginationLimit[protocol.ResourceTemplate](templates, request.Cursor, server.paginationLimit)
+		resourcesToReturn, nextCursor, err := protocol.PaginationLimit[*protocol.ResourceTemplate](templates, request.Cursor, server.paginationLimit)
 		return &protocol.ListResourceTemplatesResult{
 			ResourceTemplates: resourcesToReturn,
 			NextCursor:        nextCursor,

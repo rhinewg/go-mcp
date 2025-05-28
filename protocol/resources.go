@@ -31,8 +31,8 @@ type ListResourceTemplatesRequest struct {
 
 // ListResourceTemplatesResult represents the response to a list resource templates request
 type ListResourceTemplatesResult struct {
-	ResourceTemplates []ResourceTemplate `json:"resourceTemplates"`
-	NextCursor        Cursor             `json:"nextCursor,omitempty"`
+	ResourceTemplates []*ResourceTemplate `json:"resourceTemplates"`
+	NextCursor        Cursor              `json:"nextCursor,omitempty"`
 }
 
 // ReadResourceRequest represents a request to read a specific resource
@@ -81,7 +81,7 @@ func (r *ReadResourceResult) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Resource  A known resource that the server is capable of reading.
+// Resource A known resource that the server is capable of reading.
 type Resource struct {
 	Annotated
 	// Name A human-readable name for this resource. This can be used by clients to populate UI elements.
@@ -110,7 +110,7 @@ type ResourceTemplate struct {
 	MimeType          string                `json:"mimeType,omitempty"`
 }
 
-func (t ResourceTemplate) GetName() string {
+func (t *ResourceTemplate) GetName() string {
 	return t.Name
 }
 
@@ -307,7 +307,7 @@ func NewListResourceTemplatesRequest() *ListResourceTemplatesRequest {
 }
 
 // NewListResourceTemplatesResult creates a new list resource templates response
-func NewListResourceTemplatesResult(templates []ResourceTemplate, nextCursor Cursor) *ListResourceTemplatesResult {
+func NewListResourceTemplatesResult(templates []*ResourceTemplate, nextCursor Cursor) *ListResourceTemplatesResult {
 	return &ListResourceTemplatesResult{
 		ResourceTemplates: templates,
 		NextCursor:        nextCursor,
