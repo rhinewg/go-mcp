@@ -26,6 +26,10 @@ type deleteFileReq struct {
 	FileName string `json:"file_name" description:"file name"`
 }
 
+type updateFileReq struct {
+	FileName string `json:"file_name" description:"file name"`
+}
+
 type generatePPTReq struct {
 	PPTDesc string `json:"ppt_description" description:"PPT description"`
 }
@@ -72,6 +76,19 @@ func main() {
 	}
 	limiter.SetToolLimit(tool3.Name, pkg.Rate{Limit: 1.0, Burst: 1})
 
+	rawSchema := []byte(`{
+		"type": "object",
+		"properties": {
+			"file_name": {
+				"type": "string",
+				"description": "file name"
+			}
+		},
+		"required": ["file_name"]
+	}`)
+	tool4 := protocol.NewToolWithRawSchema("update_file", "update file", rawSchema)
+	limiter.SetToolLimit(tool4.Name, pkg.Rate{Limit: 1.0, Burst: 1})
+
 	testResource := &protocol.Resource{
 		URI:      "file:///test.txt",
 		Name:     "test1.txt",
@@ -88,6 +105,7 @@ func main() {
 	srv.RegisterTool(tool1, currentTime, rateLimit)
 	srv.RegisterTool(tool2, deleteFile, rateLimit)
 	srv.RegisterTool(tool3, generatePPT, rateLimit)
+	srv.RegisterTool(tool4, updateFile, rateLimit)
 	srv.RegisterResource(testResource, func(context.Context, *protocol.ReadResourceRequest) (*protocol.ReadResourceResult, error) {
 		return &protocol.ReadResourceResult{
 			Contents: []protocol.ResourceContents{
@@ -238,6 +256,26 @@ func generatePPT(ctx context.Context, request *protocol.CallToolRequest) (*proto
 			&protocol.TextContent{
 				Type: "text",
 				Text: fmt.Sprintf("generate PPT %s successfully", "test_name"),
+			},
+		},
+	}, nil
+}
+
+func updateFile(_ context.Context, request *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+	req := new(updateFileReq)
+	if err := pkg.JSONUnmarshal(request.RawArguments, &req); err != nil {
+		return nil, err
+	}
+
+	if req.FileName == "" {
+		return nil, errors.New("file name is empty")
+	}
+
+	return &protocol.CallToolResult{
+		Content: []protocol.Content{
+			&protocol.TextContent{
+				Type: "text",
+				Text: fmt.Sprintf("update file %s successfully", req.FileName),
 			},
 		},
 	}, nil
