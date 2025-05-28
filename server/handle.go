@@ -37,11 +37,11 @@ func (server *Server) handleRequestWithInitialize(ctx context.Context, sessionID
 		if !ok {
 			return nil, pkg.ErrLackSession
 		}
-		s.SetClientInfo(&request.ClientInfo, &request.Capabilities)
+		s.SetClientInfo(request.ClientInfo, request.Capabilities)
 		s.SetReceivedInitRequest()
 	}
 
-	return protocol.NewInitializeResult(*server.serverInfo, *server.capabilities, protocolVersion, server.instructions), nil
+	return protocol.NewInitializeResult(server.serverInfo, server.capabilities, protocolVersion, server.instructions), nil
 }
 
 func (server *Server) handleRequestWithListPrompts(rawParams json.RawMessage) (*protocol.ListPromptsResult, error) {
@@ -56,13 +56,13 @@ func (server *Server) handleRequestWithListPrompts(rawParams json.RawMessage) (*
 		}
 	}
 
-	prompts := make([]protocol.Prompt, 0)
+	prompts := make([]*protocol.Prompt, 0)
 	server.prompts.Range(func(_ string, entry *promptEntry) bool {
-		prompts = append(prompts, *entry.prompt)
+		prompts = append(prompts, entry.prompt)
 		return true
 	})
 	if server.paginationLimit > 0 {
-		resourcesToReturn, nextCursor, err := protocol.PaginationLimit[protocol.Prompt](prompts, request.Cursor, server.paginationLimit)
+		resourcesToReturn, nextCursor, err := protocol.PaginationLimit(prompts, request.Cursor, server.paginationLimit)
 		return &protocol.ListPromptsResult{
 			Prompts:    resourcesToReturn,
 			NextCursor: nextCursor,
@@ -101,13 +101,13 @@ func (server *Server) handleRequestWithListResources(rawParams json.RawMessage) 
 		}
 	}
 
-	resources := make([]protocol.Resource, 0)
+	resources := make([]*protocol.Resource, 0)
 	server.resources.Range(func(_ string, entry *resourceEntry) bool {
-		resources = append(resources, *entry.resource)
+		resources = append(resources, entry.resource)
 		return true
 	})
 	if server.paginationLimit > 0 {
-		resourcesToReturn, nextCursor, err := protocol.PaginationLimit[protocol.Resource](resources, request.Cursor, server.paginationLimit)
+		resourcesToReturn, nextCursor, err := protocol.PaginationLimit(resources, request.Cursor, server.paginationLimit)
 		return &protocol.ListResourcesResult{
 			Resources:  resourcesToReturn,
 			NextCursor: nextCursor,
@@ -137,7 +137,7 @@ func (server *Server) handleRequestWithListResourceTemplates(rawParams json.RawM
 		return true
 	})
 	if server.paginationLimit > 0 {
-		resourcesToReturn, nextCursor, err := protocol.PaginationLimit[*protocol.ResourceTemplate](templates, request.Cursor, server.paginationLimit)
+		resourcesToReturn, nextCursor, err := protocol.PaginationLimit(templates, request.Cursor, server.paginationLimit)
 		return &protocol.ListResourceTemplatesResult{
 			ResourceTemplates: resourcesToReturn,
 			NextCursor:        nextCursor,
@@ -236,7 +236,7 @@ func (server *Server) handleRequestWithListTools(rawParams json.RawMessage) (*pr
 		return true
 	})
 	if server.paginationLimit > 0 {
-		resourcesToReturn, nextCursor, err := protocol.PaginationLimit[*protocol.Tool](tools, request.Cursor, server.paginationLimit)
+		resourcesToReturn, nextCursor, err := protocol.PaginationLimit(tools, request.Cursor, server.paginationLimit)
 		return &protocol.ListToolsResult{
 			Tools:      resourcesToReturn,
 			NextCursor: nextCursor,

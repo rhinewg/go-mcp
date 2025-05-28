@@ -77,7 +77,7 @@ func main() {
 		Name:     "test1.txt",
 		MimeType: "text/plain-txt",
 	}
-	testResourceContent := protocol.TextResourceContents{
+	testResourceContent := &protocol.TextResourceContents{
 		URI:      testResource.URI,
 		MimeType: testResource.MimeType,
 		Text:     "test",
@@ -190,7 +190,7 @@ func deleteFile(ctx context.Context, request *protocol.CallToolRequest) (*protoc
 
 func requestConfirm(ctx context.Context) error {
 	resp, err := srv.Sampling(ctx, &protocol.CreateMessageRequest{
-		Messages: []protocol.SamplingMessage{
+		Messages: []*protocol.SamplingMessage{
 			{
 				Role: "user",
 				Content: &protocol.TextContent{

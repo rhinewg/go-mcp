@@ -16,7 +16,7 @@ type ListResourcesRequest struct {
 
 // ListResourcesResult The server's response to a resources/list request from the client.
 type ListResourcesResult struct {
-	Resources []Resource `json:"resources"`
+	Resources []*Resource `json:"resources"`
 	/**
 	 * An opaque token representing the pagination position after the last returned result.
 	 * If present, there may be more results available.
@@ -62,14 +62,14 @@ func (r *ReadResourceResult) UnmarshalJSON(data []byte) error {
 	r.Contents = make([]ResourceContents, len(aux.Contents))
 	for i, content := range aux.Contents {
 		// Try to unmarshal content as TextResourceContents first
-		var textContent TextResourceContents
+		var textContent *TextResourceContents
 		if err := pkg.JSONUnmarshal(content, &textContent); err == nil {
 			r.Contents[i] = textContent
 			continue
 		}
 
 		// Try to unmarshal content as BlobResourceContents
-		var blobContent BlobResourceContents
+		var blobContent *BlobResourceContents
 		if err := pkg.JSONUnmarshal(content, &blobContent); err == nil {
 			r.Contents[i] = blobContent
 			continue
@@ -97,7 +97,7 @@ type Resource struct {
 	Size     int64  `json:"size,omitempty"`
 }
 
-func (r Resource) GetName() string {
+func (r *Resource) GetName() string {
 	return r.Name
 }
 
@@ -242,11 +242,11 @@ type TextResourceContents struct {
 	MimeType string `json:"mimeType,omitempty"`
 }
 
-func (t TextResourceContents) GetURI() string {
+func (t *TextResourceContents) GetURI() string {
 	return t.URI
 }
 
-func (t TextResourceContents) GetMimeType() string {
+func (t *TextResourceContents) GetMimeType() string {
 	return t.MimeType
 }
 
@@ -256,11 +256,11 @@ type BlobResourceContents struct {
 	MimeType string `json:"mimeType,omitempty"`
 }
 
-func (b BlobResourceContents) GetURI() string {
+func (b *BlobResourceContents) GetURI() string {
 	return b.URI
 }
 
-func (b BlobResourceContents) GetMimeType() string {
+func (b *BlobResourceContents) GetMimeType() string {
 	return b.MimeType
 }
 
@@ -294,7 +294,7 @@ func NewListResourcesRequest() *ListResourcesRequest {
 }
 
 // NewListResourcesResult creates a new list resources response
-func NewListResourcesResult(resources []Resource, nextCursor Cursor) *ListResourcesResult {
+func NewListResourcesResult(resources []*Resource, nextCursor Cursor) *ListResourcesResult {
 	return &ListResourcesResult{
 		Resources:  resources,
 		NextCursor: nextCursor,

@@ -27,9 +27,9 @@ func WithSamplingHandler(handler SamplingHandler) Option {
 	}
 }
 
-func WithClientInfo(info protocol.Implementation) Option {
+func WithClientInfo(info *protocol.Implementation) Option {
 	return func(s *Client) {
-		s.clientInfo = &info
+		s.clientInfo = info
 	}
 }
 
@@ -111,7 +111,7 @@ func NewClient(t transport.ClientTransport, opts ...Option) (*Client, error) {
 		return nil, fmt.Errorf("init mcp client transpor start fail: %w", err)
 	}
 
-	if _, err := client.initialization(ctx, protocol.NewInitializeRequest(*client.clientInfo, *client.clientCapabilities)); err != nil {
+	if _, err := client.initialization(ctx, protocol.NewInitializeRequest(client.clientInfo, client.clientCapabilities)); err != nil {
 		return nil, err
 	}
 

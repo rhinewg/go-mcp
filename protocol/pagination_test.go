@@ -25,7 +25,7 @@ func BenchmarkPaginationLimitForTool(b *testing.B) {
 func BenchmarkPaginationLimit(b *testing.B) {
 	list := getTools(10000)
 	for i := 0; i < b.N; i++ {
-		_, _, _ = PaginationLimit[*Tool](list, "dG9vbDMz", 10)
+		_, _, _ = PaginationLimit(list, "dG9vbDMz", 10)
 	}
 }
 

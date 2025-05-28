@@ -32,7 +32,7 @@ func test(t *testing.T, runServer func() error, transportClient transport.Client
 	}
 
 	// Create MCP client using transport
-	mcpClient, err := client.NewClient(transportClient, client.WithClientInfo(protocol.Implementation{
+	mcpClient, err := client.NewClient(transportClient, client.WithClientInfo(&protocol.Implementation{
 		Name:    "Example MCP Client",
 		Version: "1.0.0",
 	}), client.WithSamplingHandler(&sampling{}))

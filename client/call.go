@@ -34,11 +34,11 @@ func (client *Client) initialization(ctx context.Context, request *protocol.Init
 		return nil, fmt.Errorf("failed to send InitializedNotification: %w", err)
 	}
 
-	client.clientInfo = &request.ClientInfo
-	client.clientCapabilities = &request.Capabilities
+	client.clientInfo = request.ClientInfo
+	client.clientCapabilities = request.Capabilities
 
-	client.serverInfo = &result.ServerInfo
-	client.serverCapabilities = &result.Capabilities
+	client.serverInfo = result.ServerInfo
+	client.serverCapabilities = result.Capabilities
 	client.serverInstructions = result.Instructions
 
 	client.ready.Store(true)
