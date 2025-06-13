@@ -191,7 +191,7 @@ func (t *stdioClientTransport) startReceiveErr(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			t.logger.Infof("receive server info: %s", line)
+			t.logger.Errorf("receive server error: %s", line)
 		}
 	}
 }
