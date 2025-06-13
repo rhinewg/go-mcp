@@ -23,13 +23,13 @@ const (
 
 var DefaultLogger Logger = &defaultLogger{
 	logLevel: LogLevelInfo,
-	infoLog:  log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile), // Stdio transport cannot send log information to Stdout, so here use Stderr
+	infoLog:  log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile), // Stdio transport send log information to Stdout, there may be problems.
 	errLog:   log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile),
 }
 
 var DebugLogger Logger = &defaultLogger{
 	logLevel: LogLevelDebug,
-	infoLog:  log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile),
+	infoLog:  log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile),
 	errLog:   log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile),
 }
 
