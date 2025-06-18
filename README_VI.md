@@ -1,7 +1,7 @@
 # Go-MCP
 
 <div align="center">
-<img src="docs/images/img_2.png" height="250" alt="Statusphere logo">
+<img src="docs/images/img_2.png" height="250" alt="Logo Statusphere">
 </div>
 <br/>
 
@@ -22,33 +22,28 @@
 </p>
 
 <p align="center">
-  <a href="README_CN.md">简体中文</a> | <a href="README_TW.md">繁體中文</a> | <a href="README_VI.md">Tiếng Việt</a>
+  <a href="README.md">English</a>
 </p>
 
-## 🚀 Overview
+## 🚀 Tổng quan
 
-Go-MCP is a powerful Go version of the MCP SDK that implements the Model Context Protocol (MCP) to facilitate seamless communication between external systems and AI applications. Based on the strong typing and performance advantages of the Go language, it provides a concise and idiomatic API to facilitate your integration of external systems into AI applications.
+Go-MCP là phiên bản Go mạnh mẽ của MCP SDK, triển khai Model Context Protocol (MCP) để tạo điều kiện giao tiếp liền mạch giữa các hệ thống bên ngoài và ứng dụng AI. Dựa trên những ưu điểm về kiểu dữ liệu mạnh và hiệu năng của ngôn ngữ Go, nó cung cấp API ngắn gọn và phù hợp để giúp bạn tích hợp các hệ thống bên ngoài vào ứng dụng AI.
 
-### ✨ Key Features
+### ✨ Tính năng chính
 
-- 🔄 **Complete Protocol Implementation**: Full implementation of the MCP specification, ensuring seamless integration with all compatible services
-- 🏗️ **Elegant Architecture Design**: Adopts a clear three-layer architecture, supports bidirectional communication, ensuring code modularity and extensibility
-- 🔌 **Seamless Integration with Web Frameworks**: Provides MCP protocol-compliant http.Handler, allowing developers to integrate MCP into their service frameworks
-- 🛡️ **Type Safety**: Leverages Go's strong type system for clear, highly maintainable code
-- 📦 **Simple Deployment**: Benefits from Go's static compilation, eliminating complex dependency management
-- ⚡ **High-Performance Design**: Fully utilizes Go's concurrency capabilities, maintaining excellent performance and low resource overhead across various scenarios
+- 🔄 **Triển khai giao thức đầy đủ**: Triển khai đầy đủ đặc tả MCP, đảm bảo tích hợp liền mạch với tất cả dịch vụ tương thích
+- 🏗️ **Thiết kế kiến trúc**: Áp dụng kiến trúc ba tầng rõ ràng, hỗ trợ giao tiếp hai chiều, đảm bảo tính module hóa và khả năng mở rộng của mã
+- 🔌 **Tích hợp liền mạch với các Framework Web**: Cung cấp http.Handler tuân thủ giao thức MCP, cho phép nhà phát triển tích hợp MCP vào framework dịch vụ của họ
+- 🛡️ **An toàn kiểu**: Tận dụng hệ thống kiểu mạnh của Go để có mã nguồn rõ ràng, dễ bảo trì
+- 📦 **Triển khai đơn giản**: Tận dụng khả năng biên dịch tĩnh của Go, loại bỏ việc quản lý phụ thuộc phức tạp
+- ⚡ **Thiết kế hiệu năng cao**: Tận dụng tối đa khả năng xử lý đồng thời của Go, duy trì hiệu năng xuất sắc và tài nguyên thấp trong nhiều tình huống
 
-## 🛠️ Installation
+## 🛠️ Cài đặt
+Yêu cầu Go 1.18 trở lên.
 
-```bash
-go get github.com/ThinkInAIXYZ/go-mcp
-```
+## 🎯 Bắt đầu
 
-Requires Go 1.18 or higher.
-
-## 🎯 Quick Start
-
-### Client Example
+### Ví dụ máy Client
 
 ```go
 package main
@@ -84,7 +79,7 @@ func main() {
 }
 ```
 
-### Server Example
+### Ví dụ Máy chủ
 
 ```go
 package main
@@ -153,7 +148,7 @@ func handleTimeRequest(ctx context.Context, req *protocol.CallToolRequest) (*pro
 }
 ```
 
-### Integration With Gin Server
+### Tích hợp với Gin Framework
 
 ```go
 package main
@@ -176,13 +171,13 @@ func main() {
 		log.Panicf("new sse transport and hander with error: %v", err)
 	}
 
-	// new mcp server
+	// Tạo máy chủ mcp
 	mcpServer, _ := server.NewServer(sseTransport)
 
-	// register tool with mcpServer
+	// đăng ký tool with mcpServer
 	// mcpServer.RegisterTool(tool, toolHandler)
 
-	// start mcp Server
+	// Chạy mcp Server
 	go func() {
 		mcpServer.Run()
 	}()
@@ -205,50 +200,50 @@ func main() {
 
 [Reference：A more complete example](https://github.com/ThinkInAIXYZ/go-mcp/blob/main/examples/http_handler/main.go)
 
-## 🏗️ Architecture Design
+## 🏗️ Thiết kế kiến trúc
 
-Go-MCP adopts an elegant three-layer architecture:
+Go-MCP áp dụng kiến trúc ba tầng:
 
-![Architecture Overview](docs/images/img.png)
+![Tổng quan kiến trúc](docs/images/img.png)
 
-1. **Transport Layer**: Handles underlying communication implementation, supporting multiple transport protocols
-2. **Protocol Layer**: Handles MCP protocol encoding/decoding and data structure definitions
-3. **User Layer**: Provides friendly client and server APIs
+1. **Tầng Vận chuyển**: Xử lý triển khai giao tiếp cơ bản, hỗ trợ nhiều giao thức vận chuyển
+2. **Tầng Giao thức**: Xử lý mã hóa/giải mã giao thức MCP và định nghĩa cấu trúc dữ liệu
+3. **Tầng Người dùng**: Cung cấp API thân thiện cho máy khách và máy chủ
 
-Currently supported transport methods:
+Các phương thức vận chuyển hiện được hỗ trợ:
 
-![Transport Methods](docs/images/img_1.png)
+![Phương thức vận chuyển](docs/images/img_1.png)
 
-- **HTTP SSE/POST**: HTTP-based server push and client requests, suitable for web scenarios
-- **Streamable HTTP**: Supports HTTP POST/GET requests with both stateless and stateful modes, where stateful mode utilizes SSE for multi-message streaming to enable server-to-client notifications and requests
-- **Stdio**: Standard input/output stream-based, suitable for local inter-process communication
+- **HTTP SSE/POST**: Đẩy từ máy chủ và yêu cầu từ máy khách dựa trên HTTP, phù hợp cho các tình huống web
+- **HTTP có khả năng stream**: Hỗ trợ yêu cầu HTTP POST/GET với cả chế độ stateless và stateful, trong đó chế độ stateful sử dụng SSE để streaming nhiều tin nhắn để kích hoạt thông báo và yêu cầu từ máy chủ đến máy khách
+- **Stdio**: Dựa trên luồng input/output chuẩn, phù hợp cho giao tiếp giữa các tiến trình cục bộ
 
-The transport layer uses a unified interface abstraction, making it simple to add new transport methods (like Streamable HTTP, WebSocket, gRPC) without affecting upper-layer code.
+Tầng vận chuyển sử dụng trừu tượng giao diện thống nhất, giúp dễ dàng thêm phương thức vận chuyển mới (như Streamable HTTP, WebSocket, gRPC) mà không ảnh hưởng đến mã tầng trên.
 
-## 🤝 Contributing
+## 🤝 Đóng góp
 
-We welcome all forms of contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+Chúng tôi hoan nghênh mọi hình thức đóng góp! Vui lòng xem [CONTRIBUTING.md](CONTRIBUTING.md) để biết chi tiết.
 
-## 📄 License
+## 📄 Giấy phép
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Dự án này được cấp phép theo Giấy phép MIT - xem tệp [LICENSE](LICENSE) để biết chi tiết.
 
-## 📞 Contact Us
+## 📞 Liên hệ với chúng tôi
 
-- **GitHub Issues**: [Submit an issue](https://github.com/ThinkInAIXYZ/go-mcp/issues)
-- **Discord**: Click [here](https://discord.gg/4CSU8HYt) to join our user group
-- **WeChat Group**:
+- **GitHub Issues**: [Gửi vấn đề](https://github.com/ThinkInAIXYZ/go-mcp/issues)
+- **Discord**: Nhấp [vào đây](https://discord.gg/4CSU8HYt) để tham gia nhóm người dùng của chúng tôi
+- **Nhóm WeChat**:
 
-![WeChat QR Code](docs/images/wechat_qrcode.png)
+![Mã QR WeChat](docs/images/wechat_qrcode.png)
 
-## ✨ Contributors
+## ✨ Người đóng góp
 
-Thanks to all developers who have contributed to this project!
+Cảm ơn tất cả các nhà phát triển đã đóng góp cho dự án này!
 
 <a href="https://github.com/ThinkInAIXYZ/go-mcp/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=ThinkInAIXYZ/go-mcp" alt="Contributors" />
 </a>
 
-## 📈 Project Trends
+## 📈 Xu hướng dự án
 
 [![Star History](https://api.star-history.com/svg?repos=ThinkInAIXYZ/go-mcp&type=Date)](https://www.star-history.com/#ThinkInAIXYZ/go-mcp&Date)
